@@ -225,7 +225,7 @@ Fixpoint check_symopp (bs1 bs2 bsres : list _lit) (bvop: binop)  :=
           | Abop (BO_BVand n) a1' a2' =>
             if (((a1 == a1') && (a2 == a2')) || ((a1 == a2') && (a2 == a1')))
                  && (@check_symopp bs1 bs2 bsres (BO_BVand n))
-                 && (N.of_nat (length bs1) =? n)%N
+                 && (Nat.eqb (length bs1) n)
             then lres::nil
             else C._true
 
@@ -1078,7 +1078,7 @@ Proof.
         intros f Heq2.
       case_eq (t_atom .[ f]); try (intros; now apply C.interp_true).
 
-      intros [ | | | | | | |[ A B | A| | | | ]|N|N|N|N|N|N|N|N|N| | ];
+      intros [ | | | | | | |[ A B | A| | | | | ]|N|N|N|N|N|N|N|N|N| | ];
          try (intros; now apply C.interp_true). intros n a b Heq3.
       case_eq (t_atom .[ a]); try (intros; now apply C.interp_true).
       intros c Heq4.
@@ -3118,7 +3118,7 @@ Proof.
       case_eq (t_form .[ Lit.blit lres]); try (intros; now apply C.interp_true).
       intros a bsres Heq8.
       case_eq (t_atom .[ a]); try (intros; now apply C.interp_true).
-      intros [ | | | | | | | [ A B | A | | | | ]|N|N|N|N|N|N|N|N|N| | ] a1' a2' Heq9;
+      intros [ | | | | | | | [ A B | A | | | | | ]|N|N|N|N|N|N|N|N|N| | ] a1' a2' Heq9;
         try (intros; now apply C.interp_true).
       (* BVand *)
       - case_eq ((a1 == a1') && (a2 == a2') || (a1 == a2') && (a2 == a1'));
@@ -3167,6 +3167,7 @@ Proof.
           intros Hv. rewrite Hv in H0. now contradict H0.
           intros Hv. rewrite Hv in H0. now contradict H0.
           intros Hv. rewrite Hv in H0. now contradict H0.
+          intros n Hv. rewrite Hv in H0. now contradict H0.
           intros n Hv. rewrite Hv in H0.
 
         (** n = N **)

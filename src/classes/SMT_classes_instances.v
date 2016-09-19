@@ -16,7 +16,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-Require Import Bool Int63 State OrderedType BinPos ZArith BVList.
+Require Import Bool Int63 State OrderedType BinPos ZArith BVList Word.
 Require Export SMT_classes.
 
 
@@ -263,6 +263,9 @@ Section BV.
     Comp := BV_comp n;
     Inh := BV_inh n
   |}.
+
+  Instance Word_compdec n: CompDec (word n).
+  Admitted.
 
 End BV.
 
