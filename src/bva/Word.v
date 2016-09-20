@@ -1,4 +1,5 @@
 (** Fixed precision machine words *)
+Add Rec LoadPath "." as SMTCoq.
 
 Require Import Arith Div2 NArith Bool Omega.
 Require Import Nomega.
@@ -17,6 +18,16 @@ Fixpoint wordToNat sz (w : word sz) : nat :=
     | @WS false _ w' => (wordToNat w') * 2
     | @WS true _ w' => S (wordToNat w' * 2)
   end.
+
+Fixpoint wnth n sz (w: word sz): bool :=
+  match n, w with
+   | O, WO => false
+   | O, WS b w' => b
+   | S n', WO => false
+   | S n', WS b w' => @wnth n' _ w'
+  end.
+
+ Compute @wnth 3 4 (WS true (WS true (WS false (WS true WO)))).
 
 Compute @wordToNat 4 (WS true (WS true (WS true (WS false WO)))).
 
