@@ -17,7 +17,7 @@
 
 (** A small checker for bit-vectors bit-blasting *)
 
-(*Add Rec LoadPath "." as SMTCoq.*)
+Add Rec LoadPath "." as SMTCoq.
 
 Require Import Int63 Int63Properties PArray SMT_classes.
 
@@ -1941,7 +1941,7 @@ Proof. intro bs1.
            + intros [ | ibsres zbsres ].
              * intros. simpl in *. now contradict H.
              * intros. simpl.
-               specialize (IHbs1 ybs2 zbsres (N-1)%N). 
+               specialize (IHbs1 ybs2 zbsres (N-1)%nat). 
                rewrite IHbs1. rewrite eq_head.
                unfold Lit.interp, Var.interp.
                case_eq (Lit.is_pos ibsres); intro Heq0.
@@ -2715,7 +2715,7 @@ Proof.
   case (t_form .[ Lit.blit r]) in H; try easy.
   case (PArray.length a == 2) in H; try easy.
   case ((a .[ 0] == i) && (a .[ 1] == i0) || (a .[ 0] == i0) && (a .[ 1] == i)) in H; try easy.
-  specialize (IHrbsres bs1 bs2 (N - 1)%N H).
+  specialize (IHrbsres bs1 bs2 (N - 1)%nat H).
   simpl.
   simpl in n.
   fold n' in n.
@@ -2753,7 +2753,7 @@ Proof.
   case (t_form .[ Lit.blit r]) in H; try easy.
   case (PArray.length a == 2) in H; try easy.
   case ((a .[ 0] == i) && (a .[ 1] == i0) || (a .[ 0] == i0) && (a .[ 1] == i)) in H; try easy.
-  specialize (IHrbsres bs1 bs2 (N - 1)%N H).
+  specialize (IHrbsres bs1 bs2 (N - 1)%nat H).
   simpl.
   simpl in n.
   fold n' in n.
@@ -2763,7 +2763,7 @@ Proof.
 Qed.
 
 Lemma check_symopp_bvand_length3: forall bs1 bs2 bsres n,
-  check_symopp bs1 bs2 bsres (BO_BVand (N.of_nat n)) = true ->
+  check_symopp bs1 bs2 bsres (BO_BVand n) = true ->
   (length bs1 = n)%nat ->
   (length bsres = n)%nat.
 Proof. intros bs1 bs2 bsres.
@@ -2795,21 +2795,15 @@ Proof. intros bs1 bs2 bsres.
              assert (length bs1 = (n-1)%nat).
              { omega. }
 
-             cut ( (BO_BVand (N.of_nat n - 1)) = (BO_BVand (N.of_nat (n - 1)))).
+             cut ( (BO_BVand (n-1)) = (BO_BVand (n - 1))).
 
              intros.
              revert H.
-             rewrite H2.
              intros.
              specialize (IHbsres H H1).
-             simpl. rewrite IHbsres. omega.
+             simpl. rewrite IHbsres. omega. easy.
 
              simpl.
-             cut ((N.of_nat n - 1)%N = (N.of_nat (n - 1))).
-             intros. now rewrite H2.
-
-            case n. now simpl.
-            intros. lia.
              now contradict H.
              now contradict H.
              now contradict H.
@@ -3126,7 +3120,7 @@ Proof.
 
         case_eq (
                  check_symopp bs1 bs2 bsres (BO_BVand N) &&
-                 (N.of_nat (Datatypes.length bs1) =? N)%N); 
+                (Datatypes.length bs1 =? N)); 
         simpl; intros Heq11; try (now apply C.interp_true).
 
         unfold C.valid. simpl. rewrite orb_false_r.
@@ -3171,8 +3165,6 @@ Proof.
           intros n Hv. rewrite Hv in H0.
 
         (** n = N **)
-        apply N.eqb_eq in H0.
-        rewrite <- H0 in *.
         revert v_vala Htia. rewrite Hv.
         intros v_vala Htia.
 

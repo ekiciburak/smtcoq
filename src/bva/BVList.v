@@ -631,6 +631,7 @@ Definition bvmult_bool (a b: list bool) (n: nat) : list bool :=
   end.
 
 Definition mult_list a b := bvmult_bool a b (length a).
+Definition mult_list_native a b := mult_list_carry a b (length a).
 
 Definition bv_mult (a b : bitvector) : bitvector :=
   if ((@size a) =? (@size b))

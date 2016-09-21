@@ -16,7 +16,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(*Add Rec LoadPath "." as SMTCoq.*)
+Add Rec LoadPath "." as SMTCoq.
 
 Require Import Bool Int63 PArray BinPos SMT_classes_instances.
 Require Import Misc State Word BVList.  (* FArray Equalities DecidableTypeEx. *)
@@ -474,7 +474,7 @@ Module Typ.
         intros.
         unfold i_eqb_eqb.
         destruct t; simpl; auto.
-        destruct t; simpl; auto; unfold i_eqb; simpl.
+        unfold i_eqb; simpl.
         admit.
       Admitted.
       
