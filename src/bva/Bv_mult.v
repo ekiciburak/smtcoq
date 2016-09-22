@@ -727,34 +727,50 @@ Proof. intros a b n H0 H1.
        apply mult_list_carry_comm; lia.
 Qed.
 
-Definition x : list bool := [false; true; false; false; true;
-   true; true; false; false; true; 
-   true; true; true; true; true; true; true; true; true; true; true; true].
+Definition x : list bool := [false; false; true; false; false; true;
+   true; true; false; false; true; false; false; false; true; false;
+   true; true; false; false; true;false; true; true; true; true; true; true; true; true; true; true; true; true; true; 
+   false; false; true; true; true; true; true; true; true].
 Definition y : list bool := [false; true; true; true; false; 
   true; false; false; true; true; 
-  true; true; true; true; true; true; true; true; true; true; true; true].
+  true; true; true; true; true; true; true; true; true; true; true; false; 
+  false; true; true; true; true; true; true; true; true; true; true; false; false; false; true; true; true; true; true; true; true; true].
+
+Compute length x.
+Compute length y.
+
+
+ Compute (false :: mult_list_carry (false :: x) y (length x)).
+ Compute (false :: mult_list_carry x y (length x)).
+
+Compute min (length x) (length y).
+Compute max (length x) (length y).
 
 Compute mult_list_carry x y (length x).
 Compute bvmult_bool x y (length x).
 
-Compute bvmult_bool y x (length x).
+Compute bvmult_bool x y 38.
+
+Compute (bvmult_bool y x 38).
+
+Compute bvmult_bool x (false :: y) (length x) = 
+false :: bvmult_bool x y (length x).
+
+Compute mult_list_carry x (false :: y) 7 = 
+false :: mult_list_carry x y 6.
 
 
-Lemma bvmult_bool_add_list_t_f: forall (a b: list bool) n, ((length a) > n)%nat ->
-(bvmult_bool a (true :: b) (S n)) = (add_list a (false :: bvmult_bool a b n)).
-Admitted.
+Compute add_list (true :: true :: y)
+  (false
+   :: mult_bool_step (true :: true :: x) (true :: true :: y) 
+(true :: true :: and_with_bool x true) 1 (length x)) =
+mult_bool_step (true :: true :: true :: x) (true :: true :: y)
+  (true
+   :: false
+      :: true
+         :: mult_bool_step_k_h (and_with_bool x true) (and_with_bool (firstn (length x) (true :: x)) true) true
+              (-2)) 2 (length x).
 
-Lemma bvmult_bool_comm: forall (a b: list bool) n, 
-                               (bvmult_bool a b n) = (bvmult_bool b a n).
-Admitted.
-
-Lemma bvmult_bool_f_f_1: forall (a b: list bool) n,
-                       bvmult_bool (false :: a) b (S n) = false :: bvmult_bool a b n.
-Admitted.
-
-Lemma bvmult_bool_f_f_2: forall (a b: list bool) n,
-                       bvmult_bool a (false :: b) (S n) = false :: bvmult_bool a b n.
-Admitted.
 
 Lemma length_ge: forall {A: Type} (b xsa: list A) xa, (length b >= length (xa :: xsa))%nat ->
                  (length b >= length xsa)%nat.
@@ -762,6 +778,69 @@ Proof. intros A b.
        induction b as [ | xb xsb IHb ]; intros.
        - simpl in *. lia.
        - simpl in *. lia.
+Qed.
+
+
+
+Lemma helper1: forall l1 l2, (length l2 > length l1)%nat ->
+add_list (true :: true :: l2)
+  (false
+   :: mult_bool_step (true :: true :: l1) (true :: true :: l2)
+        (true :: true :: and_with_bool l1 true) 1 (length l1)) =
+mult_bool_step (true :: true :: true :: l1) (true :: true :: l2)
+  (true
+   :: false
+      :: true
+         :: mult_bool_step_k_h (and_with_bool l1 true)
+              (and_with_bool (firstn (length l1) (true :: l1)) true) true 
+              (-2)) 2 (length l1).
+Proof. intro l1.
+       case_eq l1; simpl; intros.
+       - case_eq l2; simpl; intros.
+         subst. simpl in H0; now contradict H0.
+         case_eq b; simpl; intros;
+         case_eq l; simpl; intros; now compute.
+       - case_eq l2; simpl; intros.
+         subst. simpl in H0; now contradict H0.
+         case_eq l; simpl; intros.
+         case_eq l0; simpl; intros.
+         case_eq b0; simpl; intros. subst. 
+         contradict H0. simpl. lia.
+         subst. contradict H0. simpl. lia.
+         case_eq b0; simpl; intros;
+         case_eq b1; simpl; intros;
+         case_eq b; simpl; intros;
+         case_eq l3; simpl; intros; now compute.
+         simpl.
+         case_eq l0; simpl; intros.
+         case_eq b0; simpl; intros. subst. 
+         contradict H0. simpl. lia.
+         subst. contradict H0. simpl. lia.
+         case_eq l3; simpl; intros.
+         case_eq l4; simpl; intros. subst.
+         contradict H0. simpl. lia.
+         case_eq l5; simpl; intros;
+         case_eq b; simpl; intros;
+         case_eq b0; simpl; intros;
+         case_eq b1; simpl; intros;
+         case_eq b2; simpl; intros;
+         case_eq b3; simpl; intros;
+         now compute.
+Admitted.
+
+Lemma add_list_t: forall l, add_list (true :: l) [false] = [true].
+Proof. intro l.
+       induction l; intros.
+       - now compute.
+       - case_eq a; intros; now compute.
+Qed.
+
+
+Lemma add_list_f: forall l, add_list (false :: l) [false] = [false].
+Proof. intro l.
+       induction l; intros.
+       - now compute.
+       - case_eq a; intros; now compute.
 Qed.
 
 Lemma bvmults: forall a b, (length b >= length a)%nat ->  
@@ -777,28 +856,48 @@ Proof.
         rewrite <- H0, H2 in *.
         rewrite mult_list_carry_comm, mult_list_carry_add_list_t_f; auto.
         rewrite mult_list_carry_comm, IHa; auto.
-        
-        rewrite (@bvmult_bool_comm (true :: xsa) b), 
-        bvmult_bool_add_list_t_f; auto.
 
-        rewrite <- bvmult_bool_add_list_t_f; auto.
-        rewrite <- bvmult_bool_f_f_1.       
-        
-        rewrite bvmult_bool_comm.
-        rewrite bvmult_bool_f_f_2, bvmult_bool_add_list_t_f; auto.
+        simpl.
+        case_eq xsa; simpl; intros.
+        rewrite H0. simpl.
+        case_eq b0; simpl; intros.
+        now rewrite add_list_t.
+        now rewrite add_list_f.
+
+        case_eq l0; simpl; intros.
+        rewrite H0. simpl.
+        case_eq l; simpl; intros.
+        rewrite H4 in H3. rewrite H5 in H0. rewrite H3, H0 in H.
+        contradict H. simpl. lia.
+        case_eq l1; simpl; intros;
+        case_eq b0; case_eq b1; case_eq b2; simpl; intros; now compute.
+        rewrite H0. simpl.
+
+        admit.
 
         apply (@length_ge _ b xsa xa); easy.
         apply (@length_ge _ b xsa xa); easy.
 
         assert ((length (false :: xsa)) = S (length xsa)) by auto.
         rewrite <- H0, H2.
-        rewrite mult_list_carry_f_f_1, bvmult_bool_f_f_1.
-        apply f_equal.
-        rewrite IHa. reflexivity.
+        rewrite mult_list_carry_f_f_1.
+        rewrite IHa. simpl.
+        
+        case_eq (xsa); simpl; intros.
+        rewrite H0; simpl. case b0; easy.
+        case_eq l0; simpl; intros.
+        rewrite H0; simpl.
+        case_eq l; simpl; intros;
+        case_eq b0; case_eq b1; intros; try now simpl.
+        case_eq b2; intros; now compute.
+        case_eq b2; intros; now compute.
+        case_eq b2; intros; now compute.
+        case_eq b2; intros; now compute.
+
+        admit.
 
         apply (@length_ge _ b xsa xa); easy.
-Qed.
-
+Admitted.
 
 (* bitvector MULT properties *)
 
