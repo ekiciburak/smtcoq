@@ -22,10 +22,9 @@ Require Import Bool Int63 PArray BinPos SMT_classes_instances.
 Require Import Misc State Word BVList.  (* FArray Equalities DecidableTypeEx. *)
 Require FArray.
 Require List .
-Local Open Scope list_scope.
 Local Open Scope array_scope.
 Local Open Scope int63_scope.
-
+Local Open Scope list_scope.
 Hint Unfold is_true.
 
 
@@ -72,7 +71,8 @@ Module Form.
 
   Section Interp.
     Variable interp_atom : atom -> bool.
-    Variable interp_bvatom : atom -> forall s, BITVECTOR_LIST.bitvector s.
+    (*Variable interp_bvatom : atom -> forall s, BITVECTOR_LIST.bitvector s.*)
+    Variable interp_wordatom : atom -> forall s, Word.word s.
 
     Section Interp_form.
 
@@ -98,8 +98,8 @@ Module Form.
           else Lit.interp interp_var c
         | FbbT a ls =>
           let ils := List.map (Lit.interp interp_var) ls in
-          let n := N.of_nat (List.length ils) in
-          BITVECTOR_LIST.bv_eq (interp_bvatom a n) (BITVECTOR_LIST.of_bits ils)
+          let n := (List.length ils) in
+          weqb (interp_wordatom a n) (Word.ListToword ils n)
         end.
 
     End Interp_form.
@@ -265,7 +265,7 @@ Module Typ.
   | TZ : type
   | Tbool : type
   | Tpositive : type
-  | TBV : N -> type
+(*  | TBV : N -> type *)
   | TWord : nat -> type.
 
   
@@ -294,7 +294,7 @@ Module Typ.
       | TZ => existT (fun ty : Type => CompDec ty) Z Z_compdec
       | Tbool => existT (fun ty : Type => CompDec ty) bool bool_compdec
       | Tpositive => existT (fun ty : Type => CompDec ty) positive Positive_compdec
-      | TBV n => existT (fun ty : Type => CompDec ty) (BITVECTOR_LIST.bitvector n) (BV_compdec n)
+  (*    | TBV n => existT (fun ty : Type => CompDec ty) (BITVECTOR_LIST.bitvector n) (BV_compdec n) *)
       | TWord n => existT (fun ty : Type => CompDec ty) (word n) (Word_compdec n)
       end.
 
@@ -424,12 +424,11 @@ Module Typ.
         | TZ => Z.eqb (* Zeq_bool *)
         | Tbool => Bool.eqb
         | Tpositive => Peqb
-        | TBV n => (@BITVECTOR_LIST.bv_eq n)
+    (*    | TBV n => (@BITVECTOR_LIST.bv_eq n) *)
         | TWord n => @weqb n
         | TFArray ti te => i_eqb (TFArray ti te)
         end.
 
-      
       Lemma eqb_compdec_refl {t} (c : CompDec t) : forall x,
           eqb_of_compdec c x x = true.
         intros.
@@ -556,11 +555,12 @@ Module Typ.
       | TZ, TZ => idcast
       | Tbool, Tbool => idcast
       | Tpositive, Tpositive => idcast
-      | TBV n, TBV m =>
+  (*    | TBV n, TBV m =>
         match N_cast n m with
         | Some k => Cast (fun P => k (fun y => P (TBV y)))
         | None => NoCast
         end
+  *)
       | TWord n, TWord m =>
         match nat_cast n m with
         | Some k => Cast (fun P => k (fun y => P (TWord y)))
@@ -599,7 +599,7 @@ Module Typ.
       destruct A;simpl;trivial.
       do 2 rewrite cast_refl. easy.
       rewrite Int63Properties.cast_refl;trivial.
-      rewrite N_cast_refl;trivial.
+      (* rewrite N_cast_refl;trivial. *)
       (*TWord*) rewrite nat_cast_refl; trivial.
     Qed.
 
@@ -611,7 +611,7 @@ Module Typ.
       | TZ, TZ => true
       | Tbool, Tbool => true
       | Tpositive, Tpositive => true
-      | TBV n, TBV m => N.eqb n m
+  (*    | TBV n, TBV m => N.eqb n m *)
       | TWord n, TWord m => Nat.eqb n m
       | TFArray k1 e1, TFArray k2 e2 =>
         eqb k1 k2 && eqb e1 e2
@@ -668,7 +668,7 @@ Module Typ.
       destruct H; apply cast_diff in H; rewrite H; auto.
       case (cast A1 B1); auto.
       intros H. rewrite (Int63Properties.cast_diff _ _ H);trivial.
-      rewrite N.eqb_neq. intro Heq. now rewrite N_cast_diff.
+     (* rewrite N.eqb_neq. intro Heq. now rewrite N_cast_diff. *)
       (* TWord *) rewrite Nat.eqb_neq. intro Heq. now rewrite nat_cast_diff.
     Qed.
 
@@ -705,7 +705,7 @@ Module Typ.
       apply (reflect_iff _ _ (reflect_eqb x2 y2)) in H0.
       subst; auto.
       apply iff_reflect;rewrite Int63Properties.eqb_spec;split;intros H;[inversion H | subst]; trivial.
-      apply iff_reflect. rewrite N.eqb_eq. split;intros H;[inversion H | subst]; trivial.
+     (* apply iff_reflect. rewrite N.eqb_eq. split;intros H;[inversion H | subst]; trivial. *)
       (* TWord *) apply iff_reflect. rewrite Nat.eqb_eq. split;intros H;[inversion H | subst]; trivial.
     Qed.
 
@@ -802,20 +802,22 @@ Module Atom.
   Inductive cop : Type := 
    | CO_xH
    | CO_Z0
-   | CO_BV (_: list bool) (_ :N).
+   | CO_Word (_: list bool).
 
   Inductive unop : Type :=
    | UO_xO
    | UO_xI
    | UO_Zpos 
    | UO_Zneg
-   | UO_Zopp
+   | UO_Zopp.
+(*
    | UO_BVbitOf (_: N) (_: nat)
    | UO_BVnot   (_: N)
    | UO_BVneg   (_: N)
    | UO_BVextr  (i: N) (n0: N) (n1: N)
    | UO_BVzextn (n: N) (i: N)
    | UO_BVsextn (n: N) (i: N).
+*)
 
   Inductive binop : Type :=
    | BO_Zplus
@@ -825,12 +827,12 @@ Module Atom.
    | BO_Zle
    | BO_Zge
    | BO_Zgt
+
    | BO_eq (_ : Typ.type)
-
    | BO_BVand (_: nat)
-
-   | BO_BVor (_: N)
-   | BO_BVxor (_: N)
+   | BO_BVor (_: nat)
+   | BO_BVxor (_: nat).
+(*
    | BO_BVadd (_: N)
    | BO_BVsubst (_: N)
    | BO_BVmult (_: N)
@@ -841,6 +843,7 @@ Module Atom.
    | BO_diffarray (_ : Typ.type) (_ : Typ.type)
 
   .
+*)
   
   Inductive nop : Type :=
    | NO_distinct (_ : Typ.type).
@@ -866,7 +869,7 @@ Module Atom.
    match o, o' with
    | CO_xH, CO_xH 
    | CO_Z0, CO_Z0 => true
-   | CO_BV bv s, CO_BV bv' s' => N.eqb s s' && RAWBITVECTOR_LIST.beq_list bv bv'
+   | CO_Word l, CO_Word l' => RAWBITVECTOR_LIST.beq_list l l'
    | _,_ => false
    end.
 
@@ -877,12 +880,14 @@ Module Atom.
    | UO_Zpos, UO_Zpos 
    | UO_Zneg, UO_Zneg
    | UO_Zopp, UO_Zopp => true
+(*
    | UO_BVbitOf s1 n, UO_BVbitOf s2 m => Nat_eqb n m && N.eqb s1 s2
    | UO_BVnot s1, UO_BVnot s2 => N.eqb s1 s2
    | UO_BVneg s1, UO_BVneg s2 => N.eqb s1 s2
    | UO_BVextr i0 n00 n01, UO_BVextr i1 n10 n11 => N.eqb i0 i1 && N.eqb n00 n10 && N.eqb n01 n11
    | UO_BVzextn s1 i1, UO_BVzextn s2 i2 => N.eqb s1 s2 && N.eqb i1 i2
    | UO_BVsextn s1 i1, UO_BVsextn s2 i2 => N.eqb s1 s2 && N.eqb i1 i2
+*)
    | _,_ => false
    end.
 
@@ -895,12 +900,13 @@ Module Atom.
    | BO_Zle, BO_Zle
    | BO_Zge, BO_Zge
    | BO_Zgt, BO_Zgt => true
+
    | BO_eq t, BO_eq t' => Typ.eqb t t'
-
-   | BO_BVand s1, BO_BVand s2 => Nat.eqb s1 s2
-
+   | BO_BVand s1, BO_BVand s2
    | BO_BVor s1, BO_BVor s2
-   | BO_BVxor s1, BO_BVxor s2
+   | BO_BVxor s1, BO_BVxor s2  => Nat.eqb s1 s2
+
+(*
    | BO_BVadd s1, BO_BVadd s2
    | BO_BVsubst s1, BO_BVsubst s2
    | BO_BVmult s1, BO_BVmult s2 => N.eqb s1 s2
@@ -909,6 +915,7 @@ Module Atom.
    | BO_BVconcat s1 s2, BO_BVconcat s3 s4 => N.eqb s1 s3 && N.eqb s2 s4
    | BO_select ti te, BO_select ti' te'
    | BO_diffarray ti te, BO_diffarray ti' te' => Typ.eqb ti ti' && Typ.eqb te te'
+*)
    | _,_ => false
 
    end.
@@ -945,16 +952,19 @@ Module Atom.
   Proof.
     destruct o1; destruct o2; simpl; try (constructor; trivial; discriminate).
     apply iff_reflect. split. intro.
-    inversion H. rewrite andb_true_iff. split.
-      rewrite N.eqb_refl; auto. apply RAWBITVECTOR_LIST.List_eq_refl; auto.
-      intros. rewrite andb_true_iff in H. destruct H as (Ha, Hb).
-        apply N.eqb_eq in Ha. rewrite RAWBITVECTOR_LIST.List_eq in Hb.
-        now rewrite Ha, Hb.
+    inversion H. apply RAWBITVECTOR_LIST.List_eq_refl; auto.
+      intros. rewrite RAWBITVECTOR_LIST.List_eq in H.
+        now rewrite H.
   Qed.
 
   Lemma reflect_uop_eqb : forall o1 o2, reflect (o1 = o2) (uop_eqb o1 o2).
   Proof.
-    intros [ | | | | | s1 n1 | s1 | s1 | s1 | s1 | s1 ] [ | | | | |s2 n2 | s2 | s2 | s2 | s2 | s2 ];simpl; try constructor;trivial; try discriminate.
+    intros [ | | | | ] [ | | | | ]; simpl; try constructor;trivial; try discriminate.
+  Qed.
+
+(*
+  Proof.
+  intros [ | | | | | s1 n1 | s1 | s1 | s1 | s1 | s1 ] [ | | | | |s2 n2 | s2 | s2 | s2 | s2 | s2 ];simpl; try constructor;trivial; try discriminate.
     - apply iff_reflect. case_eq (Nat_eqb n1 n2).
       + case_eq ((s1 =? s2)%N).
         * rewrite N.eqb_eq, beq_nat_true_iff.
@@ -997,21 +1007,24 @@ Module Atom.
         rewrite N.eqb_eq in Ha, Hb.
         now subst.
   Qed.
+*)
 
 
   Lemma reflect_bop_eqb : forall o1 o2, reflect (o1 = o2) (bop_eqb o1 o2).
   Proof.
-    intros [ | | | | | | | A1|s1|s1 |s1 | s1 | s1 | s1 | s1 | s1 | s1 | I1 E1 | I1 E1 ]
-           [ | | | | | | | A2|s2|s2| s2 | s2 | s2 | s2 | s2 | s2 | s2 | I2 E2 | I2 E2 ];
+    intros [ | | | | | | | A1 | s1 | s1 | s1  ]
+           [ | | | | | | | A2 | s2 | s2 | s2  ];
       simpl;try (constructor;trivial;discriminate).
    - preflect (Typ.reflect_eqb A1 A2).
      constructor;subst;trivial.
    - preflect (Nat.eqb_spec s1 s2).
      constructor;subst;trivial.
-   - preflect (N.eqb_spec s1 s2).
+   - preflect (Nat.eqb_spec s1 s2).
      constructor;subst;trivial.
-   - preflect (N.eqb_spec s1 s2).
+   - preflect (Nat.eqb_spec s1 s2).
      constructor;subst;trivial.
+Qed.
+(*
    - preflect (N.eqb_spec s1 s2).
      constructor;subst;trivial.
    - preflect (N.eqb_spec s1 s2).
@@ -1035,6 +1048,7 @@ Module Atom.
      preflect (Typ.reflect_eqb E1 E2).
      constructor;subst;trivial.
 Qed. 
+*)
 
   Lemma reflect_top_eqb : forall o1 o2, reflect (o1 = o2) (top_eqb o1 o2).
   Proof.
@@ -1129,7 +1143,7 @@ Qed.
         match o with
         | CO_xH => Typ.Tpositive 
         | CO_Z0 => Typ.TZ
-        | CO_BV _ s => Typ.TBV s
+        | CO_Word l => Typ.TWord (Datatypes.length l)
         end.
 
       Definition typ_uop o :=
@@ -1139,12 +1153,14 @@ Qed.
         | UO_Zpos => (Typ.Tpositive, Typ.TZ)
         | UO_Zneg => (Typ.Tpositive, Typ.TZ)
         | UO_Zopp => (Typ.TZ, Typ.TZ)
+(*
         | UO_BVbitOf s _ => (Typ.TBV s, Typ.Tbool)
         | UO_BVnot s => (Typ.TBV s, Typ.TBV s)
         | UO_BVneg s => (Typ.TBV s, Typ.TBV s)
         | UO_BVextr i n0 n1 => (Typ.TBV n1, Typ.TBV n0)
         | UO_BVzextn s i => (Typ.TBV s, Typ.TBV (i + s))
         | UO_BVsextn s i => (Typ.TBV s, Typ.TBV (i + s))
+*)
         end.
 
       Definition typ_bop o := 
@@ -1156,12 +1172,12 @@ Qed.
         | BO_Zle    => ((Typ.TZ,Typ.TZ), Typ.Tbool) 
         | BO_Zge    => ((Typ.TZ,Typ.TZ), Typ.Tbool) 
         | BO_Zgt    => ((Typ.TZ,Typ.TZ), Typ.Tbool)
+
         | BO_eq t   => ((t,t),Typ.Tbool)
-
         | BO_BVand s  => ((Typ.TWord s, Typ.TWord s), Typ.TWord s)
-
-        | BO_BVor s   => ((Typ.TBV s,Typ.TBV s), Typ.TBV s)
-        | BO_BVxor s   => ((Typ.TBV s,Typ.TBV s), Typ.TBV s)
+        | BO_BVor s   => ((Typ.TWord s,Typ.TWord s), Typ.TWord s)
+        | BO_BVxor s   => ((Typ.TWord s,Typ.TWord s), Typ.TWord s)
+(*
         | BO_BVadd s   => ((Typ.TBV s,Typ.TBV s), Typ.TBV s)
         | BO_BVsubst s   => ((Typ.TBV s,Typ.TBV s), Typ.TBV s)
         | BO_BVmult s   => ((Typ.TBV s,Typ.TBV s), Typ.TBV s)
@@ -1170,6 +1186,7 @@ Qed.
         | BO_BVslt s   => ((Typ.TBV s,Typ.TBV s), Typ.Tbool)
         | BO_select ti te => ((Typ.TFArray ti te, ti), te)
         | BO_diffarray ti te => ((Typ.TFArray ti te, Typ.TFArray ti te), ti)
+*)
         end.
 
       Definition typ_top o := 
@@ -1273,6 +1290,8 @@ Qed.
       Lemma check_aux_dec : forall a,
         {exists T, check_aux a T} + {forall T, check_aux a T = false}.
       Proof.
+      Admitted.
+(*
         intros [op|op h|op h1 h2|op ha|f args | i e ]; simpl.
         (* Constants *)
         left; destruct op; simpl.
@@ -1480,6 +1499,7 @@ Qed.
         (* Application *)
         case (v_type Typ.ftype interp_ft (t_func .[ i])); intros; apply check_args_dec.
       Qed.
+*)
 
     End Typ_Aux.
     (** Interpretation of hatom assuming an interpretation for atom *)
@@ -1539,7 +1559,7 @@ Qed.
         match o with
         | CO_xH => Bval Typ.Tpositive xH
         | CO_Z0 => Bval Typ.TZ Z0
-        | CO_BV bv s => Bval (Typ.TBV s) (BITVECTOR_LIST._of_bits bv s)
+        | CO_Word l => Bval (Typ.TWord (Datatypes.length l)) (Word.ListToword l (Datatypes.length l))
         end.
 
       Definition interp_uop o :=
@@ -1549,6 +1569,7 @@ Qed.
         | UO_Zpos => apply_unop Typ.Tpositive Typ.TZ Zpos
         | UO_Zneg => apply_unop Typ.Tpositive Typ.TZ Zneg
         | UO_Zopp => apply_unop Typ.TZ Typ.TZ Zopp
+(*
         | UO_BVbitOf s n => apply_unop (Typ.TBV s) Typ.Tbool (BITVECTOR_LIST.bitOf n)
         | UO_BVnot s => apply_unop (Typ.TBV s) (Typ.TBV s) (@BITVECTOR_LIST.bv_not s)
         | UO_BVneg s => apply_unop (Typ.TBV s) (Typ.TBV s) (@BITVECTOR_LIST.bv_neg s)
@@ -1558,6 +1579,7 @@ Qed.
           apply_unop (Typ.TBV s) (Typ.TBV (i + s)) (@BITVECTOR_LIST.bv_zextn s i)
         | UO_BVsextn s i => 
           apply_unop (Typ.TBV s) (Typ.TBV (i + s)) (@BITVECTOR_LIST.bv_sextn s i)
+*)
         end.
 
       Definition interp_bop o :=
@@ -1569,15 +1591,15 @@ Qed.
          | BO_Zle => apply_binop Typ.TZ Typ.TZ Typ.Tbool Zle_bool
          | BO_Zge => apply_binop Typ.TZ Typ.TZ Typ.Tbool Zge_bool
          | BO_Zgt => apply_binop Typ.TZ Typ.TZ Typ.Tbool Zgt_bool
-         | BO_eq t => apply_binop t t Typ.Tbool (Typ.i_eqb t_i t)
 
+         | BO_eq t => apply_binop t t Typ.Tbool (Typ.i_eqb t_i t)
          | BO_BVand s =>
            apply_binop (Typ.TWord s) (Typ.TWord s) (Typ.TWord s) (@wand s)
-
          | BO_BVor s  =>
-           apply_binop (Typ.TBV s) (Typ.TBV s) (Typ.TBV s) (@BITVECTOR_LIST.bv_or s)
+           apply_binop (Typ.TWord s) (Typ.TWord s) (Typ.TWord s) (@wor s)
          | BO_BVxor s =>
-           apply_binop (Typ.TBV s) (Typ.TBV s) (Typ.TBV s) (@BITVECTOR_LIST.bv_xor s)
+           apply_binop (Typ.TWord s) (Typ.TWord s) (Typ.TWord s) (@wxor s)
+(*
          | BO_BVadd s =>
            apply_binop (Typ.TBV s) (Typ.TBV s) (Typ.TBV s) (@BITVECTOR_LIST.bv_add s)
          | BO_BVsubst s =>
@@ -1593,9 +1615,8 @@ Qed.
          | BO_select ti te => apply_binop (Typ.TFArray ti te) ti te FArray.select
          | BO_diffarray ti te =>
            apply_binop (Typ.TFArray ti te) (Typ.TFArray ti te) ti FArray.diff
-
+*)
          end.
-
 
       Definition interp_top o :=
          match o with
@@ -1718,13 +1739,6 @@ Qed.
         | _ => true
         end.
 
-      Definition interp_bv (v:bval) (s:N) : BITVECTOR_LIST.bitvector s :=
-        let (t,v) := v in
-        match Typ.cast t (Typ.TBV s) with
-        | Typ.Cast k => k _ v
-        | _ => BITVECTOR_LIST.zeros s
-        end.
-
       Definition interp_word (v:bval) (s:nat): word s :=
         let (t,v) := v in
         match Typ.cast t (Typ.TWord s) with
@@ -1757,6 +1771,8 @@ Qed.
          check_aux get_type a t ->
          exists v, interp_aux a = (Bval t v).
       Proof.
+      Admitted.
+(*
         intros [op|op h|op h1 h2|op h1 h2 h3|op ha|f l]; simpl.
         (* Constants *)
         destruct op; intros [ | i | | | | | ]; simpl; try discriminate; intros n0.
@@ -2049,7 +2065,7 @@ Qed.
         (* Application *)
         intro t; apply check_args_interp_aux.
 Qed.
-
+*)
 
       (* If an atom is not well-typed, its interpretation is bvtrue *)
 
@@ -2077,14 +2093,15 @@ Qed.
         destruct op; simpl; intro H.
         discriminate (H Typ.Tpositive).
         discriminate (H Typ.TZ).
-        specialize (H (Typ.TBV n)). simpl in H. rewrite N.eqb_refl in H. now contradict H.
+        specialize (H (Typ.TWord (Datatypes.length l))). simpl in H. rewrite Nat.eqb_refl in H. now contradict H.
         (* Unary operators *)
         destruct op; simpl; intro H; destruct (check_aux_interp_hatom h) as [v Hv];
           rewrite Hv; simpl; rewrite Typ.neq_cast;
             try (pose (H2 := H Typ.Tpositive); simpl in H2; rewrite H2; auto);
             try (pose (H2 := H Typ.TZ); simpl in H2; rewrite H2; auto);
             try (pose (H2 := H Typ.Tbool); simpl in H2; rewrite H2; auto);
-            try (pose (H2 := H Typ.TBV); simpl in H2; rewrite H2; auto).
+            try (pose (H2 := H Typ.TWord); simpl in H2; rewrite H2; auto).
+(*
             (* bv_not *)
             specialize (H (Typ.TBV n)). simpl in H. rewrite andb_false_iff in H.
             destruct H as [ H | H].
@@ -2109,7 +2126,8 @@ Qed.
             specialize (H (Typ.TBV (i + n))). simpl in H. rewrite andb_false_iff in H.
             destruct H as [ H | H].
               rewrite N.eqb_refl in H. now contradict H.
-              now rewrite H.  
+              now rewrite H.
+*)
         (* Binary operators *)
         destruct op; simpl; intro H; destruct (check_aux_interp_hatom h1) as [v1 Hv1]; 
         destruct (check_aux_interp_hatom h2) as [v2 Hv2]; rewrite Hv1, Hv2; simpl;
@@ -2118,9 +2136,9 @@ Qed.
           H2|rewrite (Typ.neq_cast (get_type h2)), H2; case (Typ.cast (get_type h1) Typ.TZ)]; auto);
         try (pose (H2 := H Typ.Tbool); simpl in H2; rewrite andb_false_iff in H2; destruct H2 as [H2|H2];
         [rewrite (Typ.neq_cast (get_type h1)), H2|rewrite (Typ.neq_cast (get_type h2)), H2; case (Typ.cast (get_type h1) Typ.TZ)]; auto);
-        try (pose (H2 := H Typ.TBV); simpl in H2; rewrite !andb_false_iff in H2; destruct H2 as [[H2|H2]|H2];
+        try (pose (H2 := H Typ.TWord); simpl in H2; rewrite !andb_false_iff in H2; destruct H2 as [[H2|H2]|H2];
         [rewrite N.eqb_refl in H2; discriminate | rewrite (Typ.neq_cast (get_type h1)), H2|rewrite (Typ.neq_cast (get_type h2)), H2;
-        case (Typ.cast (get_type h1) Typ.TBV); case (Typ.cast (get_type h1) Typ.TBV)]; auto).
+        case (Typ.cast (get_type h1) Typ.TWord); case (Typ.cast (get_type h1) Typ.TWord)]; auto).
         intros. simpl in H.
         case_eq (Typ.cast (get_type h1) t). easy. easy.
         case_eq (Typ.cast (get_type h1) t). easy. easy.
@@ -2134,23 +2152,24 @@ Qed.
           apply Typ.cast_diff in H. rewrite H.
           case (Typ.cast (get_type h1) (Typ.TWord n)); auto.
         (*BVor*)
-        specialize (H (Typ.TBV n)). simpl in H.
+        specialize (H (Typ.TWord n)). simpl in H.
         apply andb_false_iff in H. destruct H.
-        specialize (@Typ.cast_diff (get_type h1) (Typ.TBV n)). intros. 
+        specialize (@Typ.cast_diff (get_type h1) (Typ.TWord n)). intros. 
         rewrite andb_false_iff in H. destruct H as [ H | H ].
-          rewrite N.eqb_refl in H. now contradict H.
+          rewrite Nat.eqb_refl in H. now contradict H.
           apply Typ.cast_diff in H. now rewrite H.
           apply Typ.cast_diff in H. rewrite H.
-          case (Typ.cast (get_type h1) (Typ.TBV n)); auto.
+          case (Typ.cast (get_type h1) (Typ.TWord n)); auto.
         (*BVxor*)
-        specialize (H (Typ.TBV n)). simpl in H.
+        specialize (H (Typ.TWord n)). simpl in H.
         apply andb_false_iff in H. destruct H.
-        specialize (@Typ.cast_diff (get_type h1) (Typ.TBV n)). intros. 
+        specialize (@Typ.cast_diff (get_type h1) (Typ.TWord n)). intros. 
         rewrite andb_false_iff in H. destruct H as [ H | H ].
-          rewrite N.eqb_refl in H. now contradict H.
+          rewrite Nat.eqb_refl in H. now contradict H.
           apply Typ.cast_diff in H. now rewrite H.
           apply Typ.cast_diff in H. rewrite H.
-          case (Typ.cast (get_type h1) (Typ.TBV n)); auto.
+          case (Typ.cast (get_type h1) (Typ.TWord n)); auto.
+(*
         (*BVadd*)
         specialize (H (Typ.TBV n)). simpl in H.
         apply andb_false_iff in H. destruct H.
@@ -2234,7 +2253,7 @@ Qed.
         rewrite (Typ.cast_diff _ _ H); auto.
         rewrite (Typ.cast_diff _ _ H); auto.
         case (Typ.cast (get_type h1) (Typ.TFArray t t0)); auto.
-        
+*)        
         (* Ternary operators *)
         destruct op; simpl; intro H;
           destruct (check_aux_interp_hatom h1) as [v1 Hv1]; 
@@ -2412,7 +2431,9 @@ Qed.
         intros [ | | ] _; simpl.
         exists 1%positive; auto.
         exists 0%Z; auto.
-        exists (BITVECTOR_LIST._of_bits l n); auto.
+        exists (Word.ListToword l (Datatypes.length l)); auto.
+       Admitted.
+(*
         (* Unary operators *)
 
         intros [ | | | | | | | | i0 n0 n1| n i0| n i0] i H;
@@ -2521,7 +2542,7 @@ Qed.
         (* Application *)
         intros i l H; apply (check_aux_interp_aux_lt_aux a h IH l H (t_func.[i])).
 Qed.
-
+*)
       Lemma check_aux_interp_hatom_lt : forall h, h < length t_atom ->
         exists v, t_interp.[h] = Bval (get_type h) v.
       Proof.
@@ -2591,11 +2612,6 @@ Qed.
     Definition interp_form_hatom t_atom : hatom -> bool :=
       let interp := interp_hatom t_atom in
       fun a => interp_bool (interp a).
-
-    Definition interp_form_hatom_bv t_atom :
-      hatom -> forall s, BITVECTOR_LIST.bitvector s :=
-      let interp := interp_hatom t_atom in
-      fun a s => interp_bv (interp a) s.
 
     Definition interp_form_hatom_word t_atom:
       hatom -> forall s, word s :=

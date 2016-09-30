@@ -1,16 +1,32 @@
 (** Fixed precision machine words *)
 Add Rec LoadPath "." as SMTCoq.
 
-Require Import Arith Div2 NArith Bool Omega.
+Require Import Arith Div2 NArith Bool Omega List.
 Require Import Nomega.
+
+Local Open Scope list_scope.
+Import ListNotations.
 
 Set Implicit Arguments.
 
+
+(*
+Module Type W2L.
+
+Parameter word: nat -> Set.
+
+End W2L.
+*)
+
 (** * Basic definitions and conversion to and from [nat] *)
+
+(*Module WORD <: W2L.*)
 
 Inductive word : nat -> Set :=
 | WO : word O
 | WS : bool -> forall n, word n -> word (S n).
+
+(*Definition word := _word.*)
 
 Fixpoint wordToNat sz (w : word sz) : nat :=
   match w with
@@ -26,10 +42,6 @@ Fixpoint wnth n sz (w: word sz): bool :=
    | S n', WO => false
    | S n', WS b w' => @wnth n' _ w'
   end.
-
- Compute @wnth 3 4 (WS true (WS true (WS false (WS true WO)))).
-
-Compute @wordToNat 4 (WS true (WS true (WS true (WS false WO)))).
 
 Fixpoint wordToNat' sz (w : word sz) : nat :=
   match w with
@@ -73,8 +85,6 @@ Definition Nmod2 (n : N) : bool :=
 
 Definition wzero sz := natToWord sz 0.
 
-Compute wzero 5.
-
 Fixpoint wzero' (sz : nat) : word sz :=
   match sz with
     | O => WO
@@ -104,11 +114,73 @@ Fixpoint Npow2 (n : nat) : N :=
     | S n' => 2 * Npow2 n'
   end%N.
 
+(** *)
+Fixpoint wordToList n (w : word n) : list bool :=
+  match w with
+    | WO => nil
+    | @WS false _ w' => false :: wordToList w'
+    | @WS true _ w'  => true  :: wordToList w'
+  end.
 
+Fixpoint _ListToword (a: list bool) (n: nat): word n.
+Proof. case_eq a; intros.
+         case_eq n; intros.
+         + exact WO.
+         + exact (wzero (S n0)).
+         + case_eq n; intros.
+           - exact WO.
+           - case_eq b; intros.
+            -- exact (@WS true _ (_ListToword l n0)).
+            -- exact (@WS false _ (_ListToword l n0)).
+Defined.
+
+Definition ListToword (a: list bool) (n: nat): word n :=
+  if Nat.eqb (length a) n then _ListToword a n
+  else wzero n.
+
+Theorem L2W_involutive: forall n w,  (length (wordToList w) = n) -> (ListToword (@wordToList n w) n) = w.
+Proof. intros.
+       induction w.
+       - now compute.
+       - unfold ListToword. rewrite H, Nat.eqb_refl.
+         simpl in *. case_eq b;intros.
+         + rewrite <- IHw at 2. simpl.
+           unfold ListToword.
+           subst. simpl in H. inversion H. rewrite H1, Nat.eqb_refl.
+           easy.
+           subst. simpl in H. now inversion H.
+        + simpl. rewrite <- IHw at 2.
+           unfold ListToword.
+           subst. simpl in H. inversion H. rewrite H1, Nat.eqb_refl.
+           easy.
+           subst. simpl in H. now inversion H.
+Qed.
+
+(**
+Print ListToword.
+
+Fixpoint _ListToword (a: list bool): word (length a) :=
+  match a as l return (word (length l)) with
+    | [] => WO
+    | xa :: xsa => if xa then (@WS true _ (_ListToword xsa))
+                   else (@WS false _ (_ListToword xsa))
+  end.
+
+*)
+
+Theorem len_wordToList: forall sz (w: word sz), length (wordToList w) = sz.
+Proof. intros sz w.
+       induction w; intros.
+       - now simpl.
+       - simpl. case_eq b; intros; simpl; now rewrite IHw.
+Qed.
+
+(** *)
 Ltac rethink :=
   match goal with
     | [ H : ?f ?n = _ |- ?f ?m = _ ] => replace m with n; simpl; auto
   end.
+
 
 Theorem mod2_S_double : forall n, mod2 (S (2 * n)) = true.
   induction n; simpl; intuition; rethink.
@@ -244,7 +316,7 @@ Fixpoint wmsb sz (w : word sz) (a : bool) : bool :=
   end.
 
 Definition whd sz (w : word (S sz)) : bool :=
-  match w in word sz' return match sz' with
+  match w in (word sz') return match sz' with
                                | O => unit
                                | S _ => bool
                              end with
@@ -1204,3 +1276,9 @@ Lemma wplus_cancel : forall sz (a b c : word sz),
   repeat rewrite wplus_unit in H.
   assumption.
 Qed.
+
+(*End WORD.*)
+
+
+
+
