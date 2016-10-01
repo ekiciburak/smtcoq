@@ -1429,136 +1429,118 @@ Proof.
         destruct Heq11 as (Heq11, Heq11r).      
         rewrite !map_length in H100. rewrite H100.
         exact Heq11.
-Admitted.
 
-        (** symmetric case*)
+        (** symmetric case *)
         rewrite Heq10a1, Heq10a2 in *.
-        apply BITVECTOR_LIST.bv_eq_reflect in HSp2.
-        apply BITVECTOR_LIST.bv_eq_reflect in HSp1.
 
-        (* interp_form_hatom_bv a1' = 
-                interp_bv t_i (interp_atom (t_atom .[a1'])) *)
-        assert (interp_form_hatom_bv a1' = 
-                interp_bv t_i (interp_atom (t_atom .[a1']))).
-        {
-          rewrite Htia1.
-          unfold Atom.interp_form_hatom_bv.
-          unfold Atom.interp_hatom.
-          rewrite !Atom.t_interp_wf; trivial.
-          rewrite Htia1. easy.
-       }
+        apply Word.weqb_true_iff in HSp2.
+        apply Word.weqb_true_iff in HSp1.
 
-        rewrite H4 in HSp2.
-        rewrite Htia1 in HSp2.
+        unfold interp_word.
 
         (* interp_form_hatom_bv a2' = 
                 interp_bv t_i (interp_atom (t_atom .[a2'])) *)
-        assert (interp_form_hatom_bv a2'
-        = 
-        interp_bv t_i (interp_atom (t_atom .[a2']))).
+        assert (interp_form_hatom_word a2' = 
+                interp_word t_i (interp_atom (t_atom .[a2']))).
         {
           rewrite Htia2.
-          unfold Atom.interp_form_hatom_bv.
+          unfold Atom.interp_form_hatom_word.
           unfold Atom.interp_hatom.
           rewrite !Atom.t_interp_wf; trivial.
           rewrite Htia2. easy.
         }
 
-        rewrite H5 in HSp1.
-        simpl in HSp1.
+        rewrite H4 in HSp1.
         rewrite Htia2 in HSp1.
 
-        apply BITVECTOR_LIST.bv_eq_reflect.
-        unfold Bval, interp_bv.
+        (* interp_form_hatom_bv a1' = 
+                interp_bv t_i (interp_atom (t_atom .[a1'])) *)
+        assert (interp_form_hatom_word a1'
+        = 
+        interp_word t_i (interp_atom (t_atom .[a1']))).
+        {
+          rewrite Htia1.
+          unfold Atom.interp_form_hatom_word.
+          unfold Atom.interp_hatom.
+          rewrite !Atom.t_interp_wf; trivial.
+          rewrite Htia1. easy.
+        }
 
-        rewrite (@check_symopp_bvand_nl bs1 bs2 bsres N).
+        rewrite H5 in HSp2.
+        simpl in HSp2.
+        rewrite Htia1 in HSp2.
+
+        apply Word.weqb_true_iff.
+        unfold Bval. unfold interp_word.
+
+      (* rewrite (@check_symopp_bvand_nl bs1 bs2 bsres N). *)
 
         assert (
-          H100: (N.of_nat
-            (Datatypes.length
-               (RAWBITVECTOR_LIST.map2 andb (map (Lit.interp rho) bs1)
-                  (map (Lit.interp rho) bs2)))) = N).
+          H100: ((Datatypes.length (map (Lit.interp rho) bsres)) = N)).
         {
           rewrite andb_true_iff in Heq11.
           destruct Heq11 as (Heq11, Heq11r).
-          rewrite N.eqb_eq in Heq11r.
-          specialize (@RAWBITVECTOR_LIST.map2_and_length 
-          (map (Lit.interp rho) bs1) (map (Lit.interp rho) bs2)).
-          intros. rewrite <- H6.
-          apply check_symopp_bvand_length2 in Heq11.
+          apply check_symopp_bvand_length in Heq11.
           destruct Heq11 as (Heq11a, Heq11b).
-          now rewrite map_length.
-          apply check_symopp_bvand_length2 in Heq11.
+          apply beq_nat_true in Heq11r.
+          now rewrite !map_length, <- Heq11a.
+       }
+        unfold wand.
+        rewrite H100, Typ.cast_refl.
+
+       unfold interp_word in HSp1.
+        assert (
+        H102: ((Datatypes.length (map (Lit.interp rho) bs1))) = N
+        ).
+        {
+          rewrite andb_true_iff in Heq11.
+          destruct Heq11 as (Heq11, Heq11r).
+          apply check_symopp_bvand_length in Heq11.
           destruct Heq11 as (Heq11a, Heq11b).
-          now rewrite !map_length, Heq11a, Heq11b.
+          apply beq_nat_true in Heq11r. 
+          now rewrite !map_length.
         }
 
-        unfold BITVECTOR_LIST.of_bits, RAWBITVECTOR_LIST.of_bits.
-        generalize (
-          BITVECTOR_LIST.of_bits_size (RAWBITVECTOR_LIST.map2 andb 
-          (map (Lit.interp rho) bs1) 
-          (map (Lit.interp rho) bs2))
-        ).
+        revert HSp1. unfold wzero.
+        generalize (natToWord (Datatypes.length (map (Lit.interp rho) bs1)) 0).
 
-        rewrite H100.
+        rewrite H102.
         rewrite Typ.cast_refl. intros.
 
-        unfold BITVECTOR_LIST.bv_and, RAWBITVECTOR_LIST.bv_and.
-        unfold RAWBITVECTOR_LIST.size.
-        unfold RAWBITVECTOR_LIST.bits.
-
-        unfold interp_bv in HSp1, HSp2.
+        unfold interp_word in HSp1, HSp2.
         unfold BITVECTOR_LIST.of_bits, RAWBITVECTOR_LIST.of_bits in HSp1, HSp2.
 
         assert (
-          H101: (N.of_nat (Datatypes.length (map (Lit.interp rho) bs2))) = N
+          H101: ((Datatypes.length (map (Lit.interp rho) bs2))) = N
         ).
-        {
+        { 
           rewrite andb_true_iff in Heq11.
           destruct Heq11 as (Heq11, Heq11r).
-          apply check_symopp_bvand_length2 in Heq11.
+          apply check_symopp_bvand_length in Heq11.
           destruct Heq11 as (Heq11a, Heq11b).
-          rewrite <- Heq11a in Heq11b.
-          rewrite <- Heq11b in Heq11r.
-          rewrite N.eqb_eq in Heq11r.
-          now rewrite map_length.
+          apply beq_nat_true in Heq11r.
+          now rewrite !map_length, Heq11b, <- Heq11a.
         }
-
         revert HSp2.
 
-        generalize (
-        BITVECTOR_LIST.of_bits_size (map (Lit.interp rho) bs2)
-        ).
-
-        rewrite H101. intros.
-
-        assert (
-        H102: (N.of_nat (Datatypes.length (map (Lit.interp rho) bs1))) = N
-        ).
-        {
-          rewrite andb_true_iff in Heq11.
-          destruct Heq11 as (Heq11, Heq11r).
-          rewrite N.eqb_eq in Heq11r.
-          now rewrite map_length.
-        }
-
-        revert HSp1.
-
-        generalize (
-        BITVECTOR_LIST.of_bits_size (map (Lit.interp rho) bs1)
-        ).
-
-        rewrite H102. intros.
-        rewrite Typ.cast_refl in *.
-        rewrite HSp1, HSp2. simpl.
-        apply eq_rec. simpl.
-        rewrite H101, H102.
-        rewrite N.eqb_compare, N.compare_refl. 
-        now rewrite RAWBITVECTOR_LIST.map2_and_comm.
+        rewrite H101, Typ.cast_refl. intros.
+        rewrite HSp1, HSp2. simpl. rewrite <- H100.
+        rewrite !map_length.
+        rewrite wand_comm. unfold wand.
+        rewrite (@check_symopp_bvand_nl bs1 bs2 bsres). reflexivity.
+        rewrite !map_length in H100, H101, H102.
+        now rewrite H100, H102.
+        rewrite !map_length in H100, H101, H102.
+        now rewrite H101, H100.
+     
 
         rewrite andb_true_iff in Heq11.
-        destruct Heq11 as (Heq11, Heq11r).
+        destruct Heq11 as (Heq11, Heq11r).      
+        rewrite !map_length in H100. rewrite H100.
         exact Heq11.
+        - 
+Admitted.
+
 
 
   Fixpoint interp_carry (c: carry) : bool :=
