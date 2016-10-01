@@ -1113,6 +1113,36 @@ Proof. intros. unfold ListToword.
        now rewrite _helper.
 Qed.
 
+Lemma eq_head: forall {A: Type} a b (l: list A), (a :: l) = (b :: l) <-> a = b.
+Proof. intros A a b l; split; [intros H; inversion H|intros ->]; auto. Qed.
+
+Axiom afold_left_and : forall a, 
+      afold_left bool int true andb (Lit.interp rho) a = List.forallb (Lit.interp rho) (to_list a).
+
+  Axiom afold_left_or : forall a,
+    afold_left bool int false orb (Lit.interp rho) a =
+    C.interp rho (to_list a).
+
+  Axiom afold_left_xor : forall a,
+    afold_left bool int false xorb (Lit.interp rho) a =
+    C.interp rho (to_list a).
+
+Lemma eqb_spec : forall x y, (x == y) = true <-> x = y.
+Proof.
+ split;auto using eqb_correct, eqb_complete.
+Qed.
+
+Lemma to_list_two: forall {A:Type} (a: PArray.array A), 
+       PArray.length a = 2 -> (to_list a) = a .[0] :: a .[1] :: nil.
+Proof. intros A a H.
+       rewrite to_list_to_list_ntr. unfold to_list_ntr.
+       rewrite H.
+       cut (0 == 2 = false). intro H1.
+       rewrite H1.
+       unfold foldi_ntr. rewrite foldi_cont_lt; auto.
+       auto.
+Qed.
+
 Lemma check_symopp_bvand_nl: forall bs1 bs2 bsres,
   let N := length bsres in
   length bs1 = N ->
@@ -1146,13 +1176,61 @@ Proof. intro bs1.
         rewrite helper. rewrite H in H1. rewrite <- H1 in H7.
         rewrite H7 in *.
         rewrite <- IHbs1. simpl.
-        assert ((Lit.interp rho a && Lit.interp rho i) = (Lit.interp rho i0)) by admit.
-        now rewrite H8. easy. easy. rewrite H6 in H0. simpl in H0.
+        apply eqb_spec in H4. apply to_list_two in H4.
+        rewrite orb_true_iff in H5; destruct H5 as [ H5 | H5]; rewrite andb_true_iff in H5;
+        destruct H5 as (H5a, H5b); apply eqb_spec in H5a; apply eqb_spec in H5b;
+        specialize (@rho_interp (Lit.blit i0)); rewrite H3 in rho_interp; simpl in rho_interp;
+        rewrite  afold_left_and, H4 in rho_interp; simpl in rho_interp;
+        rewrite H5a, H5b, andb_true_r in rho_interp.
+          rewrite <- rho_interp.
+          now unfold Lit.interp at 3; rewrite H2; unfold Var.interp.
+          rewrite andb_comm in rho_interp.
+          rewrite <- rho_interp.
+          now unfold Lit.interp at 3; rewrite H2; unfold Var.interp.
+        easy. easy. rewrite H6 in H0. simpl in H0.
         assert ((n - 0 = n)%nat). { lia. } rewrite H8 in H0. easy.
         now contradict H. 
         now contradict H.
         now contradict H.
-Admitted.
+Qed.
+
+
+Lemma check_symopp_bvand_length: forall bs1 bs2 bsres N,
+  let n := length bsres in
+  check_symopp bs1 bs2 bsres (BO_BVand N) = true ->
+  (length bs1 = n)%nat /\ (length bs2 = n)%nat .
+Proof.
+  intros.
+  revert bs1 bs2 N H.
+  induction bsres as [ | r rbsres ].
+  intros.
+  simpl in H.
+  case bs1 in *. simpl in H.
+  case bs2 in *. simpl in *. easy. easy.
+  case bs2 in *. simpl in *. easy.
+  simpl in *. easy.
+  intros.
+  case bs1 in *.
+  case bs2 in *.
+  simpl in *. easy.
+  simpl in *. easy.
+  case bs2 in *. simpl in *. easy.
+  set (n' := length rbsres).
+  fold n' in n, IHrbsres, H.
+  simpl in IHrbsres.
+  simpl in H.
+  case (Lit.is_pos r) in H.
+  case (t_form .[ Lit.blit r]) in H; try easy.
+  case (PArray.length a == 2) in H; try easy.
+  case ((a .[ 0] == i) && (a .[ 1] == i0) || (a .[ 0] == i0) && (a .[ 1] == i)) in H; try easy.
+  specialize (IHrbsres bs1 bs2 (N - 1)%nat H).
+  simpl.
+  simpl in n.
+  fold n' in n.
+  unfold n.
+  split; apply f_equal. easy. easy.
+  easy.
+Qed.
 
 
 Lemma valid_check_bbOp s pos1 pos2 lres: C.valid rho (check_bbOp s pos1 pos2 lres).
@@ -1292,19 +1370,12 @@ Proof.
         assert (
           H100: ((Datatypes.length (map (Lit.interp rho) bsres)) = N)).
         {
-          admit.
-          (*
           rewrite andb_true_iff in Heq11.
           destruct Heq11 as (Heq11, Heq11r).
-          rewrite N.eqb_eq in Heq11r.
-          specialize (@RAWBITVECTOR_LIST.map2_and_length 
-          (map (Lit.interp rho) bs1) (map (Lit.interp rho) bs2)).
-          intros. rewrite <- H6.
-          now rewrite map_length.
-          apply check_symopp_bvand_length2 in Heq11.
+          apply check_symopp_bvand_length in Heq11.
           destruct Heq11 as (Heq11a, Heq11b).
-          now rewrite !map_length, Heq11a, Heq11b.
-          *)
+          apply beq_nat_true in Heq11r.
+          now rewrite !map_length, <- Heq11a.
        }
         unfold wand.
         rewrite H100, Typ.cast_refl.
@@ -1314,32 +1385,19 @@ Proof.
         H102: ((Datatypes.length (map (Lit.interp rho) bs1))) = N
         ).
         {
-          admit.
-          (*
           rewrite andb_true_iff in Heq11.
           destruct Heq11 as (Heq11, Heq11r).
-          rewrite N.eqb_eq in Heq11r.
-          now rewrite map_length.
-          *)
+          apply check_symopp_bvand_length in Heq11.
+          destruct Heq11 as (Heq11a, Heq11b).
+          apply beq_nat_true in Heq11r. 
+          now rewrite !map_length.
         }
 
         revert HSp1. unfold wzero.
         generalize (natToWord (Datatypes.length (map (Lit.interp rho) bs1)) 0).
-        
-        (*
-        unfold BITVECTOR_LIST.of_bits, RAWBITVECTOR_LIST.of_bits.
-        generalize (
-          BITVECTOR_LIST.of_bits_size (RAWBITVECTOR_LIST.map2 andb 
-          (map (Lit.interp rho) bs1) 
-          (map (Lit.interp rho) bs2))
-        ).
-         *)
+
         rewrite H102.
         rewrite Typ.cast_refl. intros.
-
-       (* unfold BITVECTOR_LIST.bv_and, RAWBITVECTOR_LIST.bv_and.
-        unfold RAWBITVECTOR_LIST.size.
-        unfold RAWBITVECTOR_LIST.bits. *)
 
         unfold interp_word in HSp1, HSp2.
         unfold BITVECTOR_LIST.of_bits, RAWBITVECTOR_LIST.of_bits in HSp1, HSp2.
@@ -1347,17 +1405,13 @@ Proof.
         assert (
           H101: ((Datatypes.length (map (Lit.interp rho) bs2))) = N
         ).
-        { admit.
-          (*
+        { 
           rewrite andb_true_iff in Heq11.
           destruct Heq11 as (Heq11, Heq11r).
-          apply check_symopp_bvand_length2 in Heq11.
+          apply check_symopp_bvand_length in Heq11.
           destruct Heq11 as (Heq11a, Heq11b).
-          rewrite <- Heq11a in Heq11b.
-          rewrite <- Heq11b in Heq11r.
-          rewrite N.eqb_eq in Heq11r.
-          now rewrite map_length.
-          *)
+          apply beq_nat_true in Heq11r.
+          now rewrite !map_length, Heq11b, <- Heq11a.
         }
         revert HSp2.
 
@@ -1375,7 +1429,7 @@ Proof.
         destruct Heq11 as (Heq11, Heq11r).      
         rewrite !map_length in H100. rewrite H100.
         exact Heq11.
-
+Admitted.
 
         (** symmetric case*)
         rewrite Heq10a1, Heq10a2 in *.
@@ -2350,36 +2404,6 @@ Proof.
 
   now apply check_not_length in Hcheck.
 
-Qed.
-
-Lemma eq_head: forall {A: Type} a b (l: list A), (a :: l) = (b :: l) <-> a = b.
-Proof. intros A a b l; split; [intros H; inversion H|intros ->]; auto. Qed.
-
-Axiom afold_left_and : forall a, 
-      afold_left bool int true andb (Lit.interp rho) a = List.forallb (Lit.interp rho) (to_list a).
-
-  Axiom afold_left_or : forall a,
-    afold_left bool int false orb (Lit.interp rho) a =
-    C.interp rho (to_list a).
-
-  Axiom afold_left_xor : forall a,
-    afold_left bool int false xorb (Lit.interp rho) a =
-    C.interp rho (to_list a).
-
-Lemma eqb_spec : forall x y, (x == y) = true <-> x = y.
-Proof.
- split;auto using eqb_correct, eqb_complete.
-Qed.
-
-Lemma to_list_two: forall {A:Type} (a: PArray.array A), 
-       PArray.length a = 2 -> (to_list a) = a .[0] :: a .[1] :: nil.
-Proof. intros A a H.
-       rewrite to_list_to_list_ntr. unfold to_list_ntr.
-       rewrite H.
-       cut (0 == 2 = false). intro H1.
-       rewrite H1.
-       unfold foldi_ntr. rewrite foldi_cont_lt; auto.
-       auto.
 Qed.
 
 Lemma check_symopp_and: forall ibs1 ibs2 xbs1 ybs2 ibsres zbsres N,
