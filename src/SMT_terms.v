@@ -831,9 +831,9 @@ Module Atom.
    | BO_eq (_ : Typ.type)
    | BO_BVand (_: nat)
    | BO_BVor (_: nat)
-   | BO_BVxor (_: nat).
+   | BO_BVxor (_: nat)
+   | BO_BVadd (_: nat).
 (*
-   | BO_BVadd (_: N)
    | BO_BVsubst (_: N)
    | BO_BVmult (_: N)
    | BO_BVult (_: N)
@@ -904,10 +904,10 @@ Module Atom.
    | BO_eq t, BO_eq t' => Typ.eqb t t'
    | BO_BVand s1, BO_BVand s2
    | BO_BVor s1, BO_BVor s2
-   | BO_BVxor s1, BO_BVxor s2  => Nat.eqb s1 s2
+   | BO_BVxor s1, BO_BVxor s2
+   | BO_BVadd s1, BO_BVadd s2 => Nat.eqb s1 s2
 
 (*
-   | BO_BVadd s1, BO_BVadd s2
    | BO_BVsubst s1, BO_BVsubst s2
    | BO_BVmult s1, BO_BVmult s2 => N.eqb s1 s2
    | BO_BVult s1, BO_BVult s2 => N.eqb s1 s2
@@ -1012,8 +1012,8 @@ Module Atom.
 
   Lemma reflect_bop_eqb : forall o1 o2, reflect (o1 = o2) (bop_eqb o1 o2).
   Proof.
-    intros [ | | | | | | | A1 | s1 | s1 | s1  ]
-           [ | | | | | | | A2 | s2 | s2 | s2  ];
+    intros [ | | | | | | | A1 | s1 | s1 | s1 | s1  ]
+           [ | | | | | | | A2 | s2 | s2 | s2 | s2  ];
       simpl;try (constructor;trivial;discriminate).
    - preflect (Typ.reflect_eqb A1 A2).
      constructor;subst;trivial.
@@ -1023,6 +1023,9 @@ Module Atom.
      constructor;subst;trivial.
    - preflect (Nat.eqb_spec s1 s2).
      constructor;subst;trivial.
+   - preflect (Nat.eqb_spec s1 s2).
+     constructor;subst;trivial.
+
 Qed.
 (*
    - preflect (N.eqb_spec s1 s2).
@@ -1177,8 +1180,8 @@ Qed.
         | BO_BVand s  => ((Typ.TWord s, Typ.TWord s), Typ.TWord s)
         | BO_BVor s   => ((Typ.TWord s,Typ.TWord s), Typ.TWord s)
         | BO_BVxor s   => ((Typ.TWord s,Typ.TWord s), Typ.TWord s)
+        | BO_BVadd s   => ((Typ.TWord s,Typ.TWord s), Typ.TWord s)
 (*
-        | BO_BVadd s   => ((Typ.TBV s,Typ.TBV s), Typ.TBV s)
         | BO_BVsubst s   => ((Typ.TBV s,Typ.TBV s), Typ.TBV s)
         | BO_BVmult s   => ((Typ.TBV s,Typ.TBV s), Typ.TBV s)
         | BO_BVult s   => ((Typ.TBV s,Typ.TBV s), Typ.Tbool)
@@ -1599,9 +1602,10 @@ Qed.
            apply_binop (Typ.TWord s) (Typ.TWord s) (Typ.TWord s) (@wor s)
          | BO_BVxor s =>
            apply_binop (Typ.TWord s) (Typ.TWord s) (Typ.TWord s) (@wxor s)
-(*
          | BO_BVadd s =>
-           apply_binop (Typ.TBV s) (Typ.TBV s) (Typ.TBV s) (@BITVECTOR_LIST.bv_add s)
+           apply_binop (Typ.TWord s) (Typ.TWord s) (Typ.TWord s) (@wplus s)
+(*
+
          | BO_BVsubst s =>
            apply_binop (Typ.TBV s) (Typ.TBV s) (Typ.TBV s) (@BITVECTOR_LIST.bv_subt s)
          | BO_BVmult s =>
@@ -2169,16 +2173,16 @@ Qed.
           apply Typ.cast_diff in H. now rewrite H.
           apply Typ.cast_diff in H. rewrite H.
           case (Typ.cast (get_type h1) (Typ.TWord n)); auto.
-(*
         (*BVadd*)
-        specialize (H (Typ.TBV n)). simpl in H.
+        specialize (H (Typ.TWord n)). simpl in H.
         apply andb_false_iff in H. destruct H.
-        specialize (@Typ.cast_diff (get_type h1) (Typ.TBV n)). intros. 
+        specialize (@Typ.cast_diff (get_type h1) (Typ.TWord n)). intros. 
         rewrite andb_false_iff in H. destruct H as [ H | H ].
-          rewrite N.eqb_refl in H. now contradict H.
+          rewrite Nat.eqb_refl in H. now contradict H.
           apply Typ.cast_diff in H. now rewrite H.
           apply Typ.cast_diff in H. rewrite H.
-          case (Typ.cast (get_type h1) (Typ.TBV n)); auto.
+          case (Typ.cast (get_type h1) (Typ.TWord n)); auto.
+(*
         (*BVsubt*)
         specialize (H (Typ.TBV n)). simpl in H.
         apply andb_false_iff in H. destruct H.

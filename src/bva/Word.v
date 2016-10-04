@@ -138,6 +138,13 @@ Definition ListToword (a: list bool) (n: nat): word n :=
   if Nat.eqb (length a) n then _ListToword a n
   else wzero n.
 
+Theorem len_wordToList: forall sz (w: word sz), length (wordToList w) = sz.
+Proof. intros sz w.
+       induction w; intros.
+       - now simpl.
+       - simpl. case_eq b; intros; simpl; now rewrite IHw.
+Qed.
+
 Theorem L2W_involutive: forall n w,  (length (wordToList w) = n) -> (ListToword (@wordToList n w) n) = w.
 Proof. intros.
        induction w.
@@ -156,23 +163,18 @@ Proof. intros.
            subst. simpl in H. now inversion H.
 Qed.
 
-(**
-Print ListToword.
+Theorem cons__listToWord: forall l i,
+(_ListToword (i :: l) (S (length l))) = WS i (_ListToword l (length l)).
+Proof. intro l.
+       induction l; intros.
+       - case_eq i; intros; now compute.
+       - rewrite IHl. now case_eq i; intros; case_eq a; intros; simpl.
+Qed.
 
-Fixpoint _ListToword (a: list bool): word (length a) :=
-  match a as l return (word (length l)) with
-    | [] => WO
-    | xa :: xsa => if xa then (@WS true _ (_ListToword xsa))
-                   else (@WS false _ (_ListToword xsa))
-  end.
-
-*)
-
-Theorem len_wordToList: forall sz (w: word sz), length (wordToList w) = sz.
-Proof. intros sz w.
-       induction w; intros.
-       - now simpl.
-       - simpl. case_eq b; intros; simpl; now rewrite IHw.
+Theorem cons_listToWord: forall l i,
+(ListToword (i :: l) (S (length l))) = WS i (ListToword l (length l)).
+Proof. intros.
+       unfold ListToword; simpl; rewrite !Nat.eqb_refl; apply cons__listToWord.
 Qed.
 
 (** *)
@@ -563,6 +565,41 @@ Definition wordBin (f : N -> N -> N) sz (x y : word sz) : word sz :=
 Definition wplus := wordBin Nplus.
 Definition wmult := wordBin Nmult.
 
+(*
+Let lst := [false; true; true; true; true; false; true].
+Let lst2 := [false; true; true; true; true; false; true].
+Let ind := false.
+Let a := false.
+Compute (ListToword (ind :: lst) (S (length lst)))
+= WS ind (ListToword lst (length lst)).
+
+Compute wordBin N.add (WS a (ListToword lst 6))
+  (WS ind (ListToword lst2 6)).
+*)
+
+Lemma ltWn: forall n, (_ListToword [] n) = wzero n.
+Proof. intros. case_eq n; easy. Qed.
+
+Lemma wzerosn: forall n, (wzero (S n)) = WS false (wzero n).
+Proof. intro n.
+       induction n; intros.
+       - now compute.
+       - rewrite IHn. unfold wzero. now simpl.
+Qed.
+
+Theorem ltWz: forall n a1 a2, wordBin N.add (WS a1 (wzero n)) (WS a2 (wzero n)) =
+ WS (xorb a1 a2) (wzero n).
+Admitted.
+
+
+Theorem cons_wplus: forall (l1 l2: list bool) a1 a2 n,
+a1 <> true -> a2 <> true ->
+wordBin N.add (WS a1 (ListToword l1 n)) (WS a2 (ListToword l2 n)) =
+ WS (xorb a1 a2)
+ (wordBin N.add (ListToword l1 n) (ListToword l2 n)).
+Proof. Admitted.
+
+
 Definition wmult' sz (x y : word sz) : word sz := 
   split2 sz sz (NToWord (sz + sz) (Nmult (wordToN x) (wordToN y))).
 Definition wminus sz (x y : word sz) : word sz := wplus x (wneg y).
@@ -595,6 +632,7 @@ Notation "^~" := wneg.
 Notation "l ^+ r" := (@wplus _ l%word r%word) (at level 50, left associativity).
 Notation "l ^* r" := (@wmult _ l%word r%word) (at level 40, left associativity).
 Notation "l ^- r" := (@wminus _ l%word r%word) (at level 50, left associativity).
+
 
 Theorem wordToN_nat : forall sz (w : word sz), wordToN w = N_of_nat (wordToNat w).
   induction w; intuition.
@@ -1034,6 +1072,11 @@ Definition wbring (sz : nat) : semi_ring_theory (wzero sz) (wones sz) (@wor sz) 
   (@wor_unit _) (@wor_comm _) (@wor_assoc _)
   (@wand_unit _) (@wand_kill _) (@wand_comm _) (@wand_assoc _)
   (@wand_or_distr _).
+
+Theorem wxor_comm : forall sz (x y : word sz), wxor x y = wxor y x.
+  unfold wxor; induction x; intro y; rewrite (shatter_word y); simpl; intuition; f_equal; auto with bool.
+  now rewrite xorb_comm.
+Qed.
 
 
 (** * Inequality proofs *)
