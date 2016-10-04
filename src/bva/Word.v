@@ -163,6 +163,18 @@ Proof. intros.
            subst. simpl in H. now inversion H.
 Qed.
 
+Theorem _W2L_involutive: forall w n,  (length w = n) -> (@wordToList n (_ListToword w n)) = w.
+Proof. intro w.
+       induction w; intros.
+       - simpl in *; subst; now compute.
+       - case_eq n; intros. simpl in *; subst; now contradict H0.
+         case_eq a; intros. simpl. rewrite IHw. reflexivity. subst. now inversion H.
+         simpl. rewrite IHw. reflexivity. subst. now inversion H.
+Qed.
+
+Theorem W2L_involutive: forall w n,  (length w = n) -> (@wordToList n (ListToword w n)) = w.
+Proof. intros. unfold ListToword. rewrite H, Nat.eqb_refl. apply _W2L_involutive; easy. Qed.
+
 Theorem cons__listToWord: forall l i,
 (_ListToword (i :: l) (S (length l))) = WS i (_ListToword l (length l)).
 Proof. intro l.
