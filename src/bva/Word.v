@@ -1142,11 +1142,18 @@ Fixpoint wordToZ sz (w : word sz) : Z :=
       | Npos x => Zpos x
     end.
 
+
 (** * Comparison Predicates and Deciders **)
 Definition wlt sz (l r : word sz) : Prop :=
   Nlt (wordToN l) (wordToN r).
 Definition wslt sz (l r : word sz) : Prop :=
   Zlt (wordToZ l) (wordToZ r).
+
+Definition wltb sz (l r : word sz) : bool :=
+  N.ltb (wordToN l) (wordToN r).
+
+Definition wsltb sz (l r : word sz) : bool :=
+  Z.ltb (wordToZ l) (wordToZ r).
 
 Notation "w1 > w2" := (@wlt _ w2%word w1%word) : word_scope.
 Notation "w1 >= w2" := (~(@wlt _ w1%word w2%word)) : word_scope.
@@ -1157,6 +1164,7 @@ Notation "w1 '>s' w2" := (@wslt _ w2%word w1%word) (at level 70 (*, arguments at
 Notation "w1 '>s=' w2" := (~(@wslt _ w1%word w2%word)) (at level 70(*, arguments at next level*)) : word_scope.
 Notation "w1 '<s' w2" := (@wslt _ w1%word w2%word) (at level 70(*, arguments at next level*)) : word_scope.
 Notation "w1 '<s=' w2" := (~(@wslt _ w2%word w1%word)) (at level 70(*, arguments at next level*)) : word_scope.
+
 
 Definition wlt_dec : forall sz (l r : word sz), {l < r} + {l >= r}.
   refine (fun sz l r => 

@@ -809,14 +809,14 @@ Module Atom.
    | UO_xI
    | UO_Zpos 
    | UO_Zneg
-   | UO_Zopp.
+   | UO_Zopp
+   | UO_BVzextn (n: nat) (i: nat)
+   | UO_BVsextn (n: nat) (i: nat).
 (*
    | UO_BVbitOf (_: N) (_: nat)
    | UO_BVnot   (_: N)
    | UO_BVneg   (_: N)
    | UO_BVextr  (i: N) (n0: N) (n1: N)
-   | UO_BVzextn (n: N) (i: N)
-   | UO_BVsextn (n: N) (i: N).
 *)
 
   Inductive binop : Type :=
@@ -833,12 +833,12 @@ Module Atom.
    | BO_BVor (_: nat)
    | BO_BVxor (_: nat)
    | BO_BVadd (_: nat)
-   | BO_BVconcat (n: nat) (_: nat).
+   | BO_BVconcat (n: nat) (_: nat)
+   | BO_BVult (_: nat)
+   | BO_BVslt (_: nat).
 (*
    | BO_BVsubst (_: N)
    | BO_BVmult (_: N)
-   | BO_BVult (_: N)
-   | BO_BVslt (_: N)
    | BO_select (_ : Typ.type) (_ : Typ.type)
    | BO_diffarray (_ : Typ.type) (_ : Typ.type)
 
@@ -880,13 +880,14 @@ Module Atom.
    | UO_Zpos, UO_Zpos 
    | UO_Zneg, UO_Zneg
    | UO_Zopp, UO_Zopp => true
+   | UO_BVzextn s1 i1, UO_BVzextn s2 i2 => Nat.eqb s1 s2 && Nat.eqb i1 i2
+   | UO_BVsextn s1 i1, UO_BVsextn s2 i2 => Nat.eqb s1 s2 && Nat.eqb i1 i2
 (*
    | UO_BVbitOf s1 n, UO_BVbitOf s2 m => Nat_eqb n m && N.eqb s1 s2
    | UO_BVnot s1, UO_BVnot s2 => N.eqb s1 s2
    | UO_BVneg s1, UO_BVneg s2 => N.eqb s1 s2
    | UO_BVextr i0 n00 n01, UO_BVextr i1 n10 n11 => N.eqb i0 i1 && N.eqb n00 n10 && N.eqb n01 n11
-   | UO_BVzextn s1 i1, UO_BVzextn s2 i2 => N.eqb s1 s2 && N.eqb i1 i2
-   | UO_BVsextn s1 i1, UO_BVsextn s2 i2 => N.eqb s1 s2 && N.eqb i1 i2
+
 *)
    | _,_ => false
    end.
@@ -907,11 +908,11 @@ Module Atom.
    | BO_BVxor s1, BO_BVxor s2
    | BO_BVadd s1, BO_BVadd s2 => Nat.eqb s1 s2
    | BO_BVconcat s1 s2, BO_BVconcat s3 s4 => Nat.eqb s1 s3 && Nat.eqb s2 s4
+   | BO_BVult s1, BO_BVult s2 => Nat.eqb s1 s2
+   | BO_BVslt s1, BO_BVslt s2 => Nat.eqb s1 s2
 (*
    | BO_BVsubst s1, BO_BVsubst s2
    | BO_BVmult s1, BO_BVmult s2 => N.eqb s1 s2
-   | BO_BVult s1, BO_BVult s2 => N.eqb s1 s2
-   | BO_BVslt s1, BO_BVslt s2 => N.eqb s1 s2
    | BO_select ti te, BO_select ti' te'
    | BO_diffarray ti te, BO_diffarray ti' te' => Typ.eqb ti ti' && Typ.eqb te te'
 *)
@@ -958,7 +959,11 @@ Module Atom.
 
   Lemma reflect_uop_eqb : forall o1 o2, reflect (o1 = o2) (uop_eqb o1 o2).
   Proof.
-    intros [ | | | | ] [ | | | | ]; simpl; try constructor;trivial; try discriminate.
+    intros [ | | | | | | ] [ | | | | | | ]; simpl; try constructor;trivial; try discriminate.
+    intros. preflect (Nat.eqb_spec n n0). preflect (Nat.eqb_spec i i0).  rewrite Heq, Heq0.
+    now constructor.
+    intros. preflect (Nat.eqb_spec n n0). preflect (Nat.eqb_spec i i0).  rewrite Heq, Heq0.
+    now constructor.
   Qed.
 
 (*
@@ -1011,8 +1016,8 @@ Module Atom.
 
   Lemma reflect_bop_eqb : forall o1 o2, reflect (o1 = o2) (bop_eqb o1 o2).
   Proof.
-    intros [ | | | | | | | A1 | s1 | s1 | s1 | s1 | s1  ]
-           [ | | | | | | | A2 | s2 | s2 | s2 | s2 | s2  ];
+    intros [ | | | | | | | A1 | s1 | s1 | s1 | s1 | s1 | s1 | s1  ]
+           [ | | | | | | | A2 | s2 | s2 | s2 | s2 | s2 | s2 | s2  ];
       simpl;try (constructor;trivial;discriminate).
    - preflect (Typ.reflect_eqb A1 A2).
      constructor;subst;trivial.
@@ -1028,7 +1033,12 @@ Module Atom.
      preflect (Nat.eqb_spec s1 s2).
      preflect (Nat.eqb_spec n n0).
      constructor;subst;trivial.
+   - preflect (Nat.eqb_spec s1 s2).
+     constructor;subst;trivial.
+   - preflect (Nat.eqb_spec s1 s2).
+     constructor;subst;trivial.
 Qed.
+
 (*
    - preflect (N.eqb_spec s1 s2).
      constructor;subst;trivial.
@@ -1158,13 +1168,14 @@ Qed.
         | UO_Zpos => (Typ.Tpositive, Typ.TZ)
         | UO_Zneg => (Typ.Tpositive, Typ.TZ)
         | UO_Zopp => (Typ.TZ, Typ.TZ)
+        | UO_BVzextn s i => (Typ.TWord s, Typ.TWord (i + s))
+        | UO_BVsextn s i => (Typ.TWord s, Typ.TWord (i + s))
 (*
         | UO_BVbitOf s _ => (Typ.TBV s, Typ.Tbool)
         | UO_BVnot s => (Typ.TBV s, Typ.TBV s)
         | UO_BVneg s => (Typ.TBV s, Typ.TBV s)
         | UO_BVextr i n0 n1 => (Typ.TBV n1, Typ.TBV n0)
-        | UO_BVzextn s i => (Typ.TBV s, Typ.TBV (i + s))
-        | UO_BVsextn s i => (Typ.TBV s, Typ.TBV (i + s))
+
 *)
         end.
 
@@ -1184,11 +1195,12 @@ Qed.
         | BO_BVxor s   => ((Typ.TWord s,Typ.TWord s), Typ.TWord s)
         | BO_BVadd s   => ((Typ.TWord s,Typ.TWord s), Typ.TWord s)
         | BO_BVconcat s1 s2   =>  ((Typ.TWord s1 ,Typ.TWord s2 ), Typ.TWord (s1 + s2))
+        | BO_BVult s   => ((Typ.TWord s,Typ.TWord s), Typ.Tbool)
+        | BO_BVslt s   => ((Typ.TWord s,Typ.TWord s), Typ.Tbool)
 (*
         | BO_BVsubst s   => ((Typ.TBV s,Typ.TBV s), Typ.TBV s)
         | BO_BVmult s   => ((Typ.TBV s,Typ.TBV s), Typ.TBV s)
-        | BO_BVult s   => ((Typ.TBV s,Typ.TBV s), Typ.Tbool)
-        | BO_BVslt s   => ((Typ.TBV s,Typ.TBV s), Typ.Tbool)
+
         | BO_select ti te => ((Typ.TFArray ti te, ti), te)
         | BO_diffarray ti te => ((Typ.TFArray ti te, Typ.TFArray ti te), ti)
 *)
@@ -1574,16 +1586,16 @@ Qed.
         | UO_Zpos => apply_unop Typ.Tpositive Typ.TZ Zpos
         | UO_Zneg => apply_unop Typ.Tpositive Typ.TZ Zneg
         | UO_Zopp => apply_unop Typ.TZ Typ.TZ Zopp
+        | UO_BVzextn s i => 
+          apply_unop (Typ.TWord s) (Typ.TWord (s + i)) (fun w => @zext s w i)
+        | UO_BVsextn s i => 
+          apply_unop (Typ.TWord s) (Typ.TWord (s + i)) (fun w => @sext s w i)
 (*
         | UO_BVbitOf s n => apply_unop (Typ.TBV s) Typ.Tbool (BITVECTOR_LIST.bitOf n)
         | UO_BVnot s => apply_unop (Typ.TBV s) (Typ.TBV s) (@BITVECTOR_LIST.bv_not s)
         | UO_BVneg s => apply_unop (Typ.TBV s) (Typ.TBV s) (@BITVECTOR_LIST.bv_neg s)
         | UO_BVextr i n0 n1 => 
           apply_unop (Typ.TBV n1) (Typ.TBV n0) (@BITVECTOR_LIST.bv_extr i n0 n1)
-        | UO_BVzextn s i => 
-          apply_unop (Typ.TBV s) (Typ.TBV (i + s)) (@BITVECTOR_LIST.bv_zextn s i)
-        | UO_BVsextn s i => 
-          apply_unop (Typ.TBV s) (Typ.TBV (i + s)) (@BITVECTOR_LIST.bv_sextn s i)
 *)
         end.
 
@@ -1610,6 +1622,10 @@ Qed.
          | BO_BVconcat s1 s2 =>
            apply_binop (Typ.TWord s1) (Typ.TWord s2) (Typ.TWord (s1 + s2)) 
             (fun w w' => @combine s1 w s2 w')
+         | BO_BVult s =>
+           apply_binop (Typ.TWord s) (Typ.TWord s) Typ.Tbool (@wltb s)
+         | BO_BVslt s =>
+           apply_binop (Typ.TWord s) (Typ.TWord s) Typ.Tbool (@wsltb s) 
 (*
 
          | BO_BVsubst s =>
@@ -2109,6 +2125,16 @@ Qed.
             try (pose (H2 := H Typ.TZ); simpl in H2; rewrite H2; auto);
             try (pose (H2 := H Typ.Tbool); simpl in H2; rewrite H2; auto);
             try (pose (H2 := H Typ.TWord); simpl in H2; rewrite H2; auto).
+            (* bv_zextn *)
+            specialize (H (Typ.TWord (i + n))). simpl in H. rewrite andb_false_iff in H.
+            destruct H as [ H | H].
+              rewrite Nat.eqb_refl in H. now contradict H.
+              now rewrite H.
+            (* bv_sextn *)
+            specialize (H (Typ.TWord (i + n))). simpl in H. rewrite andb_false_iff in H.
+            destruct H as [ H | H].
+              rewrite Nat.eqb_refl in H. now contradict H.
+              now rewrite H.
 (*
             (* bv_not *)
             specialize (H (Typ.TBV n)). simpl in H. rewrite andb_false_iff in H.
@@ -2125,16 +2151,7 @@ Qed.
             destruct H as [ H | H].
               rewrite N.eqb_refl in H. now contradict H.
               now rewrite H.
-            (* bv_zextn *)
-            specialize (H (Typ.TBV (i + n))). simpl in H. rewrite andb_false_iff in H.
-            destruct H as [ H | H].
-              rewrite N.eqb_refl in H. now contradict H.
-              now rewrite H.
-            (* bv_sextn *)
-            specialize (H (Typ.TBV (i + n))). simpl in H. rewrite andb_false_iff in H.
-            destruct H as [ H | H].
-              rewrite N.eqb_refl in H. now contradict H.
-              now rewrite H.
+
 *)
         (* Binary operators *)
         destruct op; simpl; intro H; destruct (check_aux_interp_hatom h1) as [v1 Hv1]; 
@@ -2195,6 +2212,37 @@ Qed.
           apply Typ.cast_diff in H. now rewrite H.
           apply Typ.cast_diff in H. rewrite H.
           case (Typ.cast (get_type h1) (Typ.TWord n)); auto.
+        (*BVult*)
+        specialize (H Typ.Tbool). simpl in H.
+        apply andb_false_iff in H. destruct H.
+        specialize (@Typ.cast_diff (get_type h1) (Typ.TWord n)). intros.
+        specialize (H0 H). now rewrite H0.
+        
+        case_eq (Typ.cast (get_type h1) (Typ.TWord n)). intros.
+        specialize (@Typ.cast_diff (get_type h2) (Typ.TWord n)). intros.
+        specialize (H1 H). easy.
+        easy.
+
+        case_eq (Typ.cast (get_type h1) (Typ.TWord n)). intros.
+        specialize (@Typ.cast_diff (get_type h2) (Typ.TWord n)). intros.
+        specialize (H1 H2). easy.
+        easy.
+
+        (*BVslt*)
+        specialize (H Typ.Tbool). simpl in H.
+        apply andb_false_iff in H. destruct H.
+        specialize (@Typ.cast_diff (get_type h1) (Typ.TWord n)). intros.
+        specialize (H0 H). now rewrite H0.
+        
+        case_eq (Typ.cast (get_type h1) (Typ.TWord n)). intros.
+        specialize (@Typ.cast_diff (get_type h2) (Typ.TWord n)). intros.
+        specialize (H1 H). easy.
+        easy.
+
+        case_eq (Typ.cast (get_type h1) (Typ.TWord n)). intros.
+        specialize (@Typ.cast_diff (get_type h2) (Typ.TWord n)). intros.
+        specialize (H1 H2). easy.
+        easy.
 (*
         (*BVsubt*)
         specialize (H (Typ.TBV n)). simpl in H.
@@ -2214,37 +2262,7 @@ Qed.
           apply Typ.cast_diff in H. now rewrite H.
           apply Typ.cast_diff in H. rewrite H.
           case (Typ.cast (get_type h1) (Typ.TBV n)); auto.
-        (*BVult*)
-        specialize (H Typ.Tbool). simpl in H.
-        apply andb_false_iff in H. destruct H.
-        specialize (@Typ.cast_diff (get_type h1) (Typ.TBV n)). intros.
-        specialize (H0 H). now rewrite H0.
-        
-        case_eq (Typ.cast (get_type h1) (Typ.TBV n)). intros.
-        specialize (@Typ.cast_diff (get_type h2) (Typ.TBV n)). intros.
-        specialize (H1 H). easy.
-        easy.
 
-        case_eq (Typ.cast (get_type h1) (Typ.TBV n)). intros.
-        specialize (@Typ.cast_diff (get_type h2) (Typ.TBV n)). intros.
-        specialize (H1 H2). easy.
-        easy.
-
-        (*BVslt*)
-        specialize (H Typ.Tbool). simpl in H.
-        apply andb_false_iff in H. destruct H.
-        specialize (@Typ.cast_diff (get_type h1) (Typ.TBV n)). intros.
-        specialize (H0 H). now rewrite H0.
-        
-        case_eq (Typ.cast (get_type h1) (Typ.TBV n)). intros.
-        specialize (@Typ.cast_diff (get_type h2) (Typ.TBV n)). intros.
-        specialize (H1 H). easy.
-        easy.
-
-        case_eq (Typ.cast (get_type h1) (Typ.TBV n)). intros.
-        specialize (@Typ.cast_diff (get_type h2) (Typ.TBV n)). intros.
-        specialize (H1 H2). easy.
-        easy.
                   
         (* BO_select *)
         specialize (H t0). simpl in H.
