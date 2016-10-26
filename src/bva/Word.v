@@ -329,6 +329,8 @@ Fixpoint wmsb sz (w : word sz) (a : bool) : bool :=
     | @WS b _ x => wmsb x b
   end.
 
+Compute @wmsb 3 (WS false (WS false (WS true WO))) false.
+
 Definition whd sz (w : word (S sz)) : bool :=
   match w in (word sz') return match sz' with
                                | O => unit
@@ -561,6 +563,8 @@ Definition sext (sz : nat) (w : word sz) (sz' : nat) : word (sz + sz') :=
     combine w (wones sz')
   else 
     combine w (wzero sz').
+
+Compute @sext 4 (WS true (WS true (WS true (WS false WO)))) 5.
 
 Definition zext (sz : nat) (w : word sz) (sz' : nat) : word (sz + sz') :=
   combine w (wzero sz').

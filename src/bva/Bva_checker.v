@@ -272,7 +272,7 @@ Fixpoint check_symopp (bs1 bs2 bsres : list _lit) (bvop: binop)  :=
   Fixpoint extend_lit (x: list _lit) (i: nat) (b: _lit) {struct i}: list _lit :=
     match i with
       | O => x
-      | S i' =>  b :: extend_lit x i' b
+      | S i' => extend_lit x i' b ++ [b]
     end.
 
   Definition zextend_lit (x: list _lit) (i: nat): list _lit :=
@@ -312,17 +312,16 @@ Fixpoint check_symopp (bs1 bs2 bsres : list _lit) (bvop: binop)  :=
   (** Checker for signed bitvector extension *)
 
 
-  Fixpoint mk_list_lit_false (t: nat) : list _lit :=
-    match t with
-      | O    => []
-      | S t' => Lit._false :: (mk_list_lit_false t')
+  Fixpoint _false_list_lit (a: list _lit) n :=
+    match n with
+      | O => a
+      | S n' => Lit._false :: _false_list_lit a n'
     end.
 
+  Definition false_list_lit n := _false_list_lit [] n.
+
   Definition sextend_lit (x: list _lit) (i: nat): list _lit :=
-    match x with
-      | []       => mk_list_lit_false i
-      | xb :: x' => extend_lit x i xb
-    end.
+    extend_lit x i (last x (Lit._false)).
 
    Definition check_sextend (bs bsres: list _lit) (i: nat) : bool :=
      if (forallb2 eq_carry_lit (lit_to_carry (sextend_lit bs i)) bsres)
@@ -2713,24 +2712,19 @@ Proof.
         now destruct Heq11 as ((Heq11, Heq11l) & Heq11r).
 Qed.
 
+Lemma len_cons: forall {A} (a: list A) c, length (a ++ [c]) = S (length a).
+Proof. intros A a.
+       induction a; intros.
+       - now simpl.
+       - simpl. now rewrite IHa.
+Qed.
+
 Lemma length_empty_ext: forall i c, (Datatypes.length (extend_lit [] i c)) = i.
 Proof. intro i.
        induction i; intros.
        - now simpl.
-       - simpl. now rewrite IHi.
-Qed. 
-
-Lemma zext_empty: forall l, (zextend_lit l 0) = l.
-Proof. intros; unfold zextend_lit; now simpl. Qed.
-
-
-Lemma zext_cons: forall i l a, (map (Lit.interp rho) (zextend_lit (a :: l) i)) = 
-                  (Lit.interp rho a) :: (map (Lit.interp rho) (zextend_lit l i)).
-Proof. intro i.
-       induction i; intros.
-       - now rewrite zext_empty.
-       - unfold zextend_lit in *. simpl. rewrite IHi.
-Admitted.
+       - simpl. rewrite <- (IHi c) at 2. now rewrite len_cons.
+Qed.
 
 Lemma word_combine_nil: forall a, Word.combine (ListToword a (Datatypes.length a)) WO = ListToword a (Datatypes.length a + 0).
 Proof. intro a.
@@ -2749,54 +2743,111 @@ Lemma ext_len: forall i a c, (length (extend_lit a i c)) =  (length a + i)%nat.
 Proof. intro i.
        induction i; intros.
        - simpl. lia.
-       - simpl. rewrite IHi. lia.
+       - simpl. rewrite len_cons, IHi. lia.
 Qed.
 
-Lemma zext_len: forall a i, (length (zextend_lit a i)) =  (length a + i)%nat.
-Proof. intros. unfold zextend_lit. now rewrite ext_len. Qed.
-
-
-Lemma wzeron: forall n, (ListToword (map (Lit.interp rho) (extend_lit [] n Lit._false)) n) = wzero n.
-Proof. intro n.
-       induction n; intros.
-       - now compute.
-       - simpl.
-         specialize (@helper_strong (map (Lit.interp rho) (extend_lit [] n Lit._false)) 
-         (Lit.interp rho  Lit._false) ); intros.
-         rewrite !map_length in H. rewrite ext_len in H. simpl in H. rewrite H.
-         rewrite IHn.
-         assert (Lit.interp rho Lit._false = false).
-           { specialize (Lit.interp_false rho wf_rho). intros.
-              rewrite <- not_true_iff_false.
-              unfold not in *.
-              intros. now apply H0. }
-         rewrite H0. unfold wzero. now simpl.
+Lemma ext_lit_cons: forall i a c, (extend_lit a (S i) c) = extend_lit a i c ++ [c].
+Proof. intro i.
+       induction i; intros.
+       - now simpl.
+       - simpl. now rewrite <- IHi.
 Qed.
 
 Lemma wzero0: (wzero 0) = WO.
 Proof. now compute. Qed.
 
+Fixpoint _false_list (a: list bool) n :=
+  match n with
+    | O => a
+    | S n' => false :: _false_list a n'
+  end.
+
+Definition false_list n := _false_list [] n.
+
+Lemma _flsi: forall i a, _false_list a (S i) = false :: _false_list a i.
+Proof. intro i.
+       induction i; intros.
+       - now simpl.
+       - rewrite IHi. now simpl.
+Qed. 
+
+Lemma _flsapp: forall i, _false_list [] i ++ [false] = false :: _false_list [] i.
+Proof. intro i.
+       induction i; intros.
+       - now simpl.
+       - simpl. now rewrite IHi.
+Qed.
+
+Lemma _flslen: forall i a, length (_false_list a i) = ((length a) + i)%nat.
+Proof. intro i.
+       induction i; intros.
+       - simpl. lia.
+       - simpl. rewrite IHi. lia.
+Qed. 
+
+Lemma _wzeroi: forall i,
+map (Lit.interp rho) (extend_lit [] i Lit._false) = false_list i.
+Proof. intro i.
+       induction i; intros.
+       - now simpl.
+       - simpl. unfold false_list. simpl. rewrite map_app. simpl.
+         assert (Lit.interp rho Lit._false = false).
+           { specialize (Lit.interp_false rho wf_rho). intros.
+              rewrite <- not_true_iff_false.
+              unfold not in *.
+              intros. now apply H. }
+         rewrite H. rewrite IHi. unfold false_list. now rewrite _flsapp.
+Qed.
+
+Lemma wzeroi: forall i,
+wzero i = ListToword (map (Lit.interp rho) (extend_lit [] i Lit._false)) i.
+Proof. intro i.
+       induction i; intros.
+       - now simpl.
+       - simpl. rewrite map_app. simpl. rewrite _wzeroi.
+         assert (Lit.interp rho Lit._false = false).
+           { specialize (Lit.interp_false rho wf_rho). intros.
+              rewrite <- not_true_iff_false.
+              unfold not in *.
+              intros. now apply H. }
+         rewrite H. unfold wzero in *. simpl. rewrite IHi.
+         rewrite _wzeroi. simpl. unfold false_list. rewrite _flsapp.
+         specialize (@helper_strong (_false_list [] i) false); intros.
+         rewrite _flslen in H0. simpl in H0. now rewrite H0.
+Qed.
+
+Lemma zext_empty: forall l, (zextend_lit l 0) = l.
+Proof. intros; unfold zextend_lit; now simpl. Qed.
+
+Lemma zext_lit_cons: forall i a c, (extend_lit a (S i) c) = extend_lit a i c ++ [c].
+Proof. intro i.
+       induction i; intros.
+       - now simpl.
+       - simpl. now rewrite <- IHi.
+Qed.
+
+Lemma zext_cons: forall i l a, 
+                  (map (Lit.interp rho) (zextend_lit (a :: l) i)) = 
+                  (Lit.interp rho a) :: (map (Lit.interp rho) (zextend_lit l i)).
+Proof. intro i.
+       induction i; intros.
+       - now rewrite zext_empty.
+       - unfold zextend_lit in *. rewrite !zext_lit_cons.
+         rewrite !map_app. simpl. now rewrite IHi.
+Qed.
+
+Lemma zext_len: forall a i, (length (zextend_lit a i)) =  (length a + i)%nat.
+Proof. intros. unfold zextend_lit. now rewrite ext_len. Qed.
 
 Lemma zextend_interp_all: forall a i, Word.zext (ListToword (map (Lit.interp rho) a) (length a)) i =
 (ListToword (map (Lit.interp rho) (zextend_lit a i)) ((length a) + i)).
 Proof. intro a.
        induction a; intros.
-       - simpl. case_eq i; intros. now simpl.
-         simpl.  unfold zext. simpl.
-         specialize (@helper_strong (map (Lit.interp rho) (extend_lit [] n Lit._false)) 
-         (Lit.interp rho  Lit._false) ); intros.
-         rewrite !map_length in H0. rewrite ext_len in H0. simpl in H0. rewrite H0.
-         simpl. rewrite wzeron.
-         assert (Lit.interp rho Lit._false = false).
-           { specialize (Lit.interp_false rho wf_rho). intros.
-              rewrite <- not_true_iff_false.
-              unfold not in *.
-              intros. now apply H1. }
-         rewrite H1. unfold wzero. now simpl.
+       - simpl. unfold zext, zextend_lit. simpl. now rewrite wzeroi.
        - simpl. unfold zext in *.
          specialize (@helper_strong (map (Lit.interp rho) a0) (Lit.interp rho a) ); intros.
          rewrite !map_length in H. rewrite H. simpl. rewrite IHa.
-         rewrite zext_cons. 
+         rewrite zext_cons.
          specialize (@helper_strong ( map (Lit.interp rho) (zextend_lit a0 i)) (Lit.interp rho a) ); intros.
          rewrite !map_length in H0.
          assert ((Datatypes.length (zextend_lit a0 i)) =  (Datatypes.length a0 + i)%nat).
@@ -2834,6 +2885,7 @@ Proof. intro bs1.
          rewrite H0 in H; now contradict H.
 Qed.
 
+
 Lemma zextend_interp_main: forall bs1 bsres (i: nat),
                            check_zextend bs1 bsres i = true ->
                            Word.zext (ListToword (map (Lit.interp rho) bs1) (length bs1)) i  =
@@ -2848,9 +2900,9 @@ Proof. intro bs1.
          apply prop_eq_carry_lit2 in H0.
          rewrite prop_interp_carry3 in H0.
          simpl in H0. unfold zext. rewrite <- H0. simpl. unfold zextend_lit in *.
-         now rewrite wzeron.
+         now rewrite wzeroi.
          intros. rewrite H0 in H; now contradict H.
-       - intros. unfold RAWBITVECTOR_LIST.bv_zextn, check_zextend in H.
+       - intros. unfold zext, check_zextend in H.
          case_eq (
           forallb2 eq_carry_lit
           (lit_to_carry
@@ -2863,12 +2915,13 @@ Proof. intro bs1.
          unfold zext in *.
          specialize (@helper_strong (map (Lit.interp rho) xsbs1) 
          (Lit.interp rho xbs1) ); intros. rewrite !map_length in H1. rewrite H1. simpl.
-         rewrite <- H0. rewrite zext_cons.
+
+         rewrite <- H0.
+         rewrite (@IHbs1 (zextend_lit  xsbs1 i) i). rewrite zext_cons.
          specialize (@helper_strong (map (Lit.interp rho) (zextend_lit xsbs1 i)) 
          (Lit.interp rho xbs1) ); intros. rewrite !map_length in H2. rewrite zext_len in H2.
-         rewrite H2. 
-         
-         rewrite (@IHbs1 (zextend_lit xsbs1 i) i). reflexivity.
+         now rewrite H2. 
+
          unfold check_zextend. now rewrite forallb_eqb_refl.
          rewrite H0 in H; now contradict H.
 Qed.
@@ -3213,194 +3266,1134 @@ Lemma check_add_word:forall bs1 bs2 bsres c,
    (ListToword (map (Lit.interp rho) bsres) n).
 Proof. intros. now rewrite (@check_add_list bs1 bs2 bsres). Qed.
 
-Lemma check_add_listword:forall bs1 bs2 bsres c, 
-  let n := length bsres in
-  (length bs1 = n)%nat -> 
-  (length bs2 = n)%nat -> 
-  check_add bs1 bs2 bsres c ->
-    (Word.wplus (ListToword (map (Lit.interp rho) bs1) n) (ListToword (map (Lit.interp rho) bs2) n))
-    =
-   (ListToword (map (Lit.interp rho) bsres) n).
-Proof. intro bs1.
-       induction bs1; intros.
-       - simpl in *; subst. symmetry in H; rewrite empty_list_length in H; subst.
-        simpl in H0. rewrite empty_list_length in H0; subst. now compute.
-       - simpl. case_eq bs2; intros; rewrite <- H0, H2 in H; try now contradict H.
-         simpl.
-         unfold check_add in H1. rewrite H2 in H1.
-         case_eq bsres; intros; rewrite H3 in H1; try now contradict H1.
-         case_eq (Lit.is_pos i0); intros; rewrite H4 in H1.
-         case_eq (t_form .[ Lit.blit i0]); intros; rewrite H5 in H1; try now contradict H1.
-         case_eq (Lit.is_pos i1); intros; rewrite H6 in H1.
-         case_eq (t_form .[ Lit.blit i1]); intros; rewrite H7 in H1; try now contradict H1.
-         unfold is_true in H1; rewrite andb_true_iff in H1; destruct H1 as (H1a, H1b).
-         fold check_add in H1b. unfold wplus in *.
+Lemma check_add_bvadd: forall bs1 bs2 bsres n, 
+  (N.of_nat(length bs1) = n)%N -> 
+  (N.of_nat(length bs2) = n)%N -> 
+  (N.of_nat(length bsres) = n)%N ->  
+  check_add bs1 bs2 bsres (Clit Lit._false) = true ->
+  (RAWBITVECTOR_LIST.bv_add (map (Lit.interp rho) bs1) (map (Lit.interp rho) bs2) =
+   (map (Lit.interp rho) bsres)).
+Proof. intros.
+       pose proof H as H'. pose proof H0 as H0'. pose proof H1 as H1'.
+       rewrite <- H1 in H. apply Nat2N.inj in H.
+       rewrite <- H1 in H0. apply Nat2N.inj in H0.
+       specialize (@check_add_list bs1 bs2 bsres ( (Clit Lit._false)) H H0 H2). intros.
+       unfold RAWBITVECTOR_LIST.bv_add.
+       unfold RAWBITVECTOR_LIST.size, RAWBITVECTOR_LIST.bits.
+       unfold BITVECTOR_LIST.of_bits.
+       rewrite !map_length, H, H0.
+       rewrite N.eqb_refl.
+
+       assert (  (interp_carry (Clit Lit._false)) = false).
+       {
+         specialize (Lit.interp_false rho wf_rho). intros.
+         unfold is_true in H4.
+         rewrite not_true_iff_false in H4.
+         now unfold interp_carry.
+       }
+
+       rewrite H4 in H3.
+       unfold RAWBITVECTOR_LIST.add_list.
+       apply H3.
+Qed.
+
+
+Lemma check_add_addlist: forall bs1 bs2 bsres n, 
+  (N.of_nat(length bs1) = n)%N -> 
+  (N.of_nat(length bs2) = n)%N -> 
+  (N.of_nat(length bsres) = n)%N ->  
+  check_add bs1 bs2 bsres (Clit Lit._false) = true ->
+  (RAWBITVECTOR_LIST.add_list (map (Lit.interp rho) bs1) (map (Lit.interp rho) bs2) =
+   (map (Lit.interp rho) bsres)).
+Proof. intros.
+       pose proof H as H'. pose proof H0 as H0'. pose proof H1 as H1'.
+       rewrite <- H1 in H. apply Nat2N.inj in H.
+       rewrite <- H1 in H0. apply Nat2N.inj in H0.
+       specialize (@check_add_list bs1 bs2 bsres ( (Clit Lit._false)) H H0 H2). intros.
+       unfold RAWBITVECTOR_LIST.bv_add.
+       unfold RAWBITVECTOR_LIST.size, RAWBITVECTOR_LIST.bits.
+       unfold BITVECTOR_LIST.of_bits.
+
+       assert (  (interp_carry (Clit Lit._false)) = false).
+       {
+         specialize (Lit.interp_false rho wf_rho). intros.
+         unfold is_true in H4.
+         rewrite not_true_iff_false in H4.
+         now unfold interp_carry.
+       }
+
+       rewrite H4 in H3.
+       unfold RAWBITVECTOR_LIST.add_list.
+       apply H3.
+Qed.
+
+Fixpoint listToN (l: list bool) : N :=
+  match l with
+    | [] => 0
+    | xl :: xsl =>
+    if xl then Nsucc (2* listToN xsl)
+    else  (2* listToN xsl)
+  end%N.
+
+  Fixpoint listTonat (l: list bool) : nat :=
+  match l with
+    | [] => O
+    | xl :: xsl =>
+    if xl then S (2* listTonat xsl)
+    else  (2 * listTonat xsl)
+  end%nat.
+  
+Fixpoint mod2 (n : nat) : bool :=
+  match n with
+    | O => false
+    | 1%nat => true
+    | S (S n') => mod2 n'
+  end.
+
+
+Require Import Div2.
+
+Fixpoint natTolist (sz n : nat) {struct sz} : list bool :=
+  match sz with
+    | O => []
+    | S sz' => (mod2 n) :: (natTolist sz' (div2 n))
+  end.
+
+Fixpoint posToList (n : nat) (p : positive) {struct p} : list bool :=
+  match n with
+    | O => []
+    | S n' =>
+      match p with
+        | xI p' => true  :: (posToList n' p')
+        | xO p' => false :: (posToList n' p')
+        | xH    => true  :: (RAWBITVECTOR_LIST.mk_list_false n')
+      end
+  end.
+
+Definition NToList (n : N) (sz : nat): list bool :=
+  match n with
+    | N0     => RAWBITVECTOR_LIST.mk_list_false sz
+    | Npos p => posToList sz p
+  end.
+
+Lemma len_n2l: forall sz n, length (natTolist sz n) = sz.
+Proof. intro sz.
+       induction sz as [ | xsz IHsz ]; intros.
+       - now simpl.
+       - simpl. now rewrite IHsz.
+Qed.
+
+Lemma ltN: forall a, (listToN (true :: a)) = Nsucc (2* listToN a).
+Proof. intro a.
+       case_eq a; intros.
+       - now simpl.
+       - simpl. case_eq b; intros;
+         case_eq (listToN l); intros; now simpl.
+Qed.
+
 
 (*
-         case_eq (RAWBITVECTOR_LIST.add_carry (Lit.interp rho a) 
-          (Lit.interp rho i) (interp_carry c)); intros r c0 Heqrc.
+Let a := [true; true; true; false; true; true; false; true; true; true].
+Let b := [true; true; true; true; true; true; true; true; true; true].
+Let c := [false; true; true; false; true; true; true].
+Let d := [true; true; true; true; true; true; true].
+
+Compute listTonat (true :: a).
+Compute listTonat (true :: b). 
+
+Compute RAWBITVECTOR_LIST.add_list (true :: a) (true :: b) =
+natTolist 10 (S (listTonat a + listTonat a + S (listTonat b + listTonat b))).
+
+
+
+Let a : list bool := [true; true; true; true; false; true; true; true; false; true; true].
+Let b : list bool := [true; true; true; true; true; false; false; true; false; true; true].
+Let n := 25.
+
+Compute
+natTolist (length a) (listTonat a + listTonat b) = NToList (listToN a + listToN b) (length a).
+
+Compute 
+true :: natTolist (n-1) (listTonat a + listTonat b) =
+natTolist n (S (listTonat a + listTonat a + (listTonat b + listTonat b))).
+
+Compute RAWBITVECTOR_LIST.add_list_ingr a b true =
+natTolist (Datatypes.length a) (S (listTonat a + listTonat b)).
+
+Compute RAWBITVECTOR_LIST.add_list_ingr a b true =
+natTolist (Datatypes.length a) (S (listTonat a + listTonat b)).
+
+Compute RAWBITVECTOR_LIST.add_list (true :: true :: a) (true :: true :: b) =
+false :: true :: natTolist (Datatypes.length a) (S (listTonat a + listTonat b)).
+
+Compute RAWBITVECTOR_LIST.add_list (true :: true :: true :: a)
+  (true :: true :: true :: b) =
+false :: true :: RAWBITVECTOR_LIST.add_list (true :: a)
+  (true :: b).
+
+Compute RAWBITVECTOR_LIST.add_list_ingr a b true =
+     natTolist (Init.Nat.min (Datatypes.length a) (Datatypes.length b))
+       (S (listTonat a + listTonat b)).
+
+Compute RAWBITVECTOR_LIST.add_list_ingr a b false =
+natTolist (Init.Nat.min (Datatypes.length a) (Datatypes.length b)) (listTonat a + listTonat b).
+
+
+Let m := (listTonat a + listTonat b)%nat.
+Let n := (length a)%nat.
+
+Compute RAWBITVECTOR_LIST.add_list (true :: a) (true :: b) =
+mod2 (listTonat a + listTonat a + (listTonat b + listTonat b))
+:: natTolist (Datatypes.length a)
+     (S (Nat.div2 (listTonat a + listTonat a + (listTonat b + listTonat b)))).
+
+
+Compute RAWBITVECTOR_LIST.add_list a b.
+
+Compute RAWBITVECTOR_LIST.add_list a b = mod2 m :: natTolist (n-1) (Nat.div2 m).
+
+Compute RAWBITVECTOR_LIST.add_list a b = mod2 (m - 1) :: natTolist n (Nat.div2 m).
+
+Compute RAWBITVECTOR_LIST.add_list (true :: a) (true :: b) = mod2 (m - 1) :: natTolist n (S (Nat.div2 m)).
+
+
+Compute listTonat (RAWBITVECTOR_LIST.add_list (true :: a) (true :: b)) =
+(S (listTonat a + listTonat a + S (listTonat b + listTonat b))).
+
+Compute listTonat a.
+Compute listTonat b.
+Compute natTolist (S (Datatypes.length a)) (S (listTonat (true :: a) + listTonat (true :: b))).
+Compute natTolist (Datatypes.length a) (S (listTonat a + listTonat b)).
+Compute true :: natTolist (Datatypes.length c) (S (listTonat c + listTonat d)).
+Compute RAWBITVECTOR_LIST.add_list (true :: a) (true :: b) =
+false :: natTolist (Datatypes.length a) ((listTonat a + listTonat b)).
+Compute RAWBITVECTOR_LIST.add_list (true :: a) (true :: b) =
+false :: natTolist (Datatypes.length a) (S (listTonat a + listTonat b)).
+Compute RAWBITVECTOR_LIST.add_list a b. 
+Compute natTolist 4 (listTonat a + listTonat b).
+Compute RAWBITVECTOR_LIST.add_list (true :: a) (true :: b). 
+Compute mod2 (53 - 1) :: natTolist 4 (S (Nat.div2 53)).
+
+Compute RAWBITVECTOR_LIST.add_list (true :: a) (true :: b) = true :: natTolist 4 0.
+Compute RAWBITVECTOR_LIST.add_list (true :: a) (true :: b).
+Compute RAWBITVECTOR_LIST.add_list (true :: a) (true :: b) =
+mod2 4 :: natTolist (listTonat a + listTonat a + S (listTonat b + listTonat b)) (Nat.div2 4).
+
+Compute RAWBITVECTOR_LIST.add_list a b = NToList (Nplus (listToN a) (listToN b)) 4.
+Compute NToList (listToN a + listToN b) 4.
+Compute NToList (listToN a + listToN b) 3.
+
+Let a := WS true (WS true (WS false (WS true WO))).
+Let b := WS true (WS true (WS true (WS true WO))).
+Compute RAWBITVECTOR_LIST.add_list (wordToList a) (wordToList b) = 
+NToList (Nplus (wordToN a) (wordToN b)) 4.
+
+Compute Word.wplus a b = NToWord 4 (Nplus (wordToN a) (wordToN b)).
+
+
 *)
-         specialize (@Word.cons_listToWord (map (Lit.interp rho) bs1) 
-          (Lit.interp rho a)); intros.
-         rewrite map_length in H1. assert (n = S (length bs1)).
-         { subst. simpl. rewrite H0 in H. now inversion H. } rewrite H8.
-         rewrite H1.
 
-         specialize (@Word.cons_listToWord (map (Lit.interp rho) l) 
-          (Lit.interp rho i)); intros. rewrite map_length in H9.
-         assert (length bs1 = length l).
-         { now inversion H. } rewrite H10, H9.
+(** prove *)
+Lemma moddiv2:  forall a b,
+mod2
+     (Nat.div2
+        (listTonat a + listTonat a + S (listTonat a + listTonat a) +
+         (listTonat b + listTonat b + S (listTonat b + listTonat b))))
+= true.
+Admitted.
 
-         specialize (@IHbs1 l l0 (Cor (Cand (Clit a) (Clit i))
-         (Cand (Cxor (Clit a) (Clit i)) c))).
+(** prove *)
+Lemma natdiv2: forall a b,
+(Nat.div2
+              (Nat.div2
+                 (listTonat a + listTonat a + S (listTonat a + listTonat a) +
+                  (listTonat b + listTonat b + S (listTonat b + listTonat b)))))
+=
+(listTonat a + listTonat b)%nat.
+Admitted.
 
-        (** rho_interp Lit.blit i0 **)
-        pose proof (rho_interp (Lit.blit i0)). rewrite H5 in H11. simpl in H11.
+(** prove *)
+Lemma natmod2:  forall a b,
+mod2
+  (listTonat a + listTonat a + S (listTonat a + listTonat a) +
+   (listTonat b + listTonat b + S (listTonat b + listTonat b)))
+= false.
+Admitted.
 
-        (** rho_interp Lit.blit i1 **)
-        pose proof (rho_interp (Lit.blit i1)). rewrite H7 in H12. simpl in H12.
- 
-          simpl. unfold Lit.interp at 5. rewrite H4. unfold Var.interp.
-          rewrite H11. unfold Lit.interp at 5. rewrite H6. unfold Var.interp.
-          rewrite H12. simpl.
-          specialize (helper_strong (map (Lit.interp rho) l0)
-          (xorb (xorb (Lit.interp rho i3) (Lit.interp rho i4)) (Lit.interp rho i2)) ).
-          intros. rewrite !map_length in H13. 
+(** prove *)
+Lemma natdiv2': forall a b,
+(Nat.div2 (listTonat a + listTonat a + (listTonat b + listTonat b)))
+=
+(listTonat a + listTonat b)%nat.
+Admitted.
 
-         assert (length l = length l0). 
-         { unfold n in H0. rewrite H2, H3 in H0. now inversion H0. } rewrite H14, H13.
-         rewrite <- IHbs1.
+(** prove *)
+Lemma natmod2':  forall a b,
+mod2 (listTonat a + listTonat a + (listTonat b + listTonat b))
+= false.
+Admitted.
 
-        rewrite andb_true_iff, orb_true_iff in H1a.
-        destruct H1a as (H1c, H1d); destruct H1c as [ H1c | H1c ];
-        rewrite andb_true_iff in H1c;  destruct H1c as (H1c, H1e);
-        rewrite eqb_spec in H1c, H1e; rewrite <- H1c, <- H1e in *.
-        apply  prop_eq_carry_lit in H1d. rewrite <- H1d in *.
+(** prove *)
+Lemma natmod2'': forall a b,
+ mod2 (listTonat a + listTonat a + S (listTonat b + listTonat b))
+= true.
+Admitted.
 
-        unfold Lit.interp in H11; rewrite H6 in H11; unfold Var.interp in H11; 
-        rewrite H12 in H11.
+(** prove *)
+Lemma natmod2''': forall a b,
+(Nat.div2 (listTonat a + listTonat a + S (listTonat b + listTonat b)))
+=
+(listTonat a + listTonat b)%nat.
+Admitted.
 
-Check wordBin.
-
-        case_eq (Lit.interp rho i3); case_eq (Lit.interp rho i4); case_eq (interp_carry c);
-        intros; rewrite H15, H16, H17 in H11; rewrite H15, H16, H17 in *;
-        simpl in *. easy. inversion Heqrc; simpl.
-here...
- try now compute. simpl. compute.
-
-
-Lemma check_add_listword:forall bs1 bs2 bsres c, 
-  let n := length bsres in
-  (length bs1 = n)%nat -> 
-  (length bs2 = n)%nat -> 
-  check_add bs1 bs2 bsres c ->
-    (ListToword (RAWBITVECTOR_LIST.add_list_ingr (map (Lit.interp rho) bs1) (map (Lit.interp rho) bs2)
-    (interp_carry c)) n)
-    =
-    (Word.wplus (ListToword (map (Lit.interp rho) bs1) n) (ListToword (map (Lit.interp rho) bs2) n)).
-Proof. intro bs1.
-       induction bs1; intros.
-       - simpl in *; subst. symmetry in H; rewrite empty_list_length in H; subst.
-        simpl in H0. rewrite empty_list_length in H0; subst. now compute.
-       - simpl. case_eq bs2; intros; rewrite <- H0, H2 in H; try now contradict H.
-         simpl.
-         unfold check_add in H1. rewrite H2 in H1.
-         case_eq bsres; intros; rewrite H3 in H1; try now contradict H1.
-         case_eq (Lit.is_pos i0); intros; rewrite H4 in H1.
-         case_eq (t_form .[ Lit.blit i0]); intros; rewrite H5 in H1; try now contradict H1.
-         case_eq (Lit.is_pos i1); intros; rewrite H6 in H1.
-         case_eq (t_form .[ Lit.blit i1]); intros; rewrite H7 in H1; try now contradict H1.
-         unfold is_true in H1; rewrite andb_true_iff in H1; destruct H1 as (H1a, H1b).
-         fold check_add in H1b. unfold wplus in *.
-
-         case_eq (RAWBITVECTOR_LIST.add_carry (Lit.interp rho a) 
-          (Lit.interp rho i) (interp_carry c)); intros r c0 Heqrc.
-
-         specialize (@Word.cons_listToWord (map (Lit.interp rho) bs1) 
-          (Lit.interp rho a)); intros.
-         rewrite map_length in H1. assert (n = S (length bs1)).
-         { subst. simpl. rewrite H0 in H. now inversion H. } rewrite H8.
-         rewrite H1.
-         specialize (@Word.cons_listToWord (map (Lit.interp rho) l) 
-          (Lit.interp rho i)); intros. rewrite map_length in H9.
-         assert (length bs1 = length l).
-         { now inversion H. } rewrite H10, H9.
-
-
-         rewrite cons_wplus.
-
-         specialize (@IHbs1 l l0 (Cor (Cand (Clit a) (Clit i))
-         (Cand (Cxor (Clit a) (Clit i)) c))).
-         assert (length l = length l0). 
-         { unfold n in H0. rewrite H2, H3 in H0. now inversion H0. }
-         rewrite <- H11 in IHbs1. rewrite <- IHbs1. simpl.
-
-        (** rho_interp Lit.blit i0 **)
-        pose proof (rho_interp (Lit.blit i0)). rewrite H5 in H12. simpl in H12.
-
-        (** rho_interp Lit.blit i1 **)
-        pose proof (rho_interp (Lit.blit i1)). rewrite H7 in H13. simpl in H13.
-
-        specialize (helper_strong 
-          (RAWBITVECTOR_LIST.add_list_ingr (map (Lit.interp rho) bs1) (map (Lit.interp rho) l) c0)
-          r); intros.
-        assert ((Datatypes.length
-              (RAWBITVECTOR_LIST.add_list_ingr (map (Lit.interp rho) bs1) 
-                 (map (Lit.interp rho) l) c0)) = 
-        (Datatypes.length l)). 
-        { rewrite <- (@RAWBITVECTOR_LIST.add_list_carry_length_eq
-         (map (Lit.interp rho) bs1) (map (Lit.interp rho) l) c0), map_length. easy.  
-         rewrite !map_length. easy.
-        } rewrite H15 in H14.
-        rewrite H14.
-
-        cut (r =  (xorb (Lit.interp rho a) (Lit.interp rho i))).
-        cut (c0 = (Lit.interp rho a && Lit.interp rho i
-         || xorb (Lit.interp rho a) (Lit.interp rho i) && interp_carry c)).
-  
-        intros. now rewrite H16, H17.
-   
-        (** c0 *)
-        case_eq (Lit.interp rho a); case_eq (Lit.interp rho i); case_eq (interp_carry c);
-        intros; rewrite H16, H17, H18 in Heqrc; inversion Heqrc; try now compute.
-      
-        (** r *)
-        rewrite andb_true_iff, orb_true_iff in H1a.
-        destruct H1a as (H1c, H1d); destruct H1c as [ H1c | H1c ];
-        rewrite andb_true_iff in H1c;  destruct H1c as (H1c, H1e);
-        rewrite eqb_spec in H1c, H1e; rewrite <- H1c, <- H1e in *.
-        apply  prop_eq_carry_lit in H1d.
-        unfold Lit.interp in H12 at 1. rewrite H6 in H12. unfold Var.interp in H12.
-        rewrite H13, <- H1d in H12. simpl in H12.
-        case_eq (Lit.interp rho i0); intros.
-        assert (rho (Lit.blit i0) = true).
-        { unfold Lit.interp in H16. rewrite H4 in H16.
-          now unfold Var.interp in H16. }
-        rewrite H17 in H12.
-
-        case_eq (Lit.interp rho i3); case_eq (Lit.interp rho i4); case_eq (interp_carry c);
-        intros; rewrite H18, H19, H20 in Heqrc; rewrite H18, H19, H20 in H12;
-        simpl in Heqrc; simpl in H12; inversion Heqrc; try now compute. simpl. compute.
-      
-         
-  
-
-       admit. admit. admit. admit. exact H1b.
-       now contradict H1.
-       now contradict H1.
+(** prove *)
+Lemma natdiv2'': forall a b,
+(Nat.div2 (listTonat a + listTonat a + (listTonat b + listTonat b)))
+= (listTonat a + listTonat b)%nat.
 Admitted.
 
 
-Lemma check_add_wplus:forall bs1 bs2 bsres c, 
+Lemma nlf: forall a: list bool,
+natTolist (Datatypes.length a) 0 = RAWBITVECTOR_LIST.mk_list_false (Datatypes.length a)%nat.
+Proof. intro a.
+       induction a as [ | xa xsa IHa ]; intros.
+       - now simpl.
+       - simpl. now rewrite IHa.
+Qed.
+
+Lemma lnf: forall a: list bool,
+listTonat a = 0%nat ->
+a = RAWBITVECTOR_LIST.mk_list_false (Datatypes.length a)%nat.
+Proof. intro a.
+       induction a as [ | xa xsa IHa ]; intros.
+       - now simpl.
+       - simpl. case_eq xa; intros.
+         + subst. now contradict H.
+         + rewrite IHa, RAWBITVECTOR_LIST.length_mk_list_false. 
+           reflexivity.
+           inversion H. rewrite H0 in *. rewrite H2. lia.
+Qed.
+
+Lemma mlf: forall n,
+RAWBITVECTOR_LIST.add_list_ingr (RAWBITVECTOR_LIST.mk_list_false n)
+  (RAWBITVECTOR_LIST.mk_list_false n) false =
+  (RAWBITVECTOR_LIST.mk_list_false n).
+Proof. intro n.
+       induction n as [ | xn IHn]; intros.
+       - now simpl.
+       - simpl. now rewrite IHn.
+Qed.
+
+Lemma helper_conv_tf: forall a n,
+RAWBITVECTOR_LIST.add_list_ingr a
+  (natTolist n 0) true 
+=
+RAWBITVECTOR_LIST.add_list_ingr a
+  (natTolist n 1) false.
+Proof. intro a.
+       induction a as [ | xa xsa IHa ]; intros.
+       - now simpl.
+       - case_eq xa ;intros; try now simpl.
+         case_eq n; intros. now simpl.
+         now simpl.
+         case_eq n; intros. now simpl.
+         now simpl.
+Qed.
+
+
+
+Lemma helper_conv_tf2: forall a b,
+(length a = length b) ->
+RAWBITVECTOR_LIST.add_list_ingr a b true
+=
+RAWBITVECTOR_LIST.add_list_ingr a
+  (RAWBITVECTOR_LIST.add_list_ingr b 
+    (natTolist (Datatypes.length a) 1) false) false.
+Proof. intro a.
+       induction a as [ | xa xsa IHa ]; intros.
+       - now simpl.
+       - case_eq b; intros.
+         + subst. now contradict H.
+         + case_eq xa; case_eq b0; intros.
+           simpl. apply f_equal.
+           specialize (helper_conv_tf l); intros.
+           rewrite H0 in H. inversion H. rewrite H5, H3.
+           now rewrite <- H5, IHa.
+           simpl. apply f_equal. rewrite nlf, RAWBITVECTOR_LIST.add_list_carry_empty_neutral_n_r.
+           reflexivity. rewrite H0 in H. inversion H. lia.
+           simpl. apply f_equal.
+           specialize (helper_conv_tf l); intros.
+           rewrite H0 in H. inversion H. rewrite H5, H3.
+           now rewrite <- H5, IHa.
+           simpl. apply f_equal. rewrite nlf, RAWBITVECTOR_LIST.add_list_carry_empty_neutral_n_r.
+           reflexivity. rewrite H0 in H. inversion H. lia.
+Qed.
+
+Lemma empty_total: forall a b: nat,
+(a + a + (b + b))%nat = 0%nat
+->
+(a + b)%nat = 0%nat.
+Proof. intro a.
+       induction a as [ | xa IHa ]; intros; lia.
+Qed.
+
+Lemma empty_total2: forall a b: nat,
+(a + b)%nat = 0%nat -> a%nat = 0%nat /\ b%nat = 0%nat .
+Proof. intro a.
+       induction a as [ | xa IHa ]; intros; lia.
+Qed.
+
+Lemma mod2Sn: forall n,
+mod2 (n + S n) = true.
+Proof. intro n.
+       induction n as [ | xn IHn ]; intros.
+       - now simpl.
+       - simpl. assert ((xn + S (S xn))%nat = (S (xn + (S xn)))%nat) by now simpl.
+         now rewrite H.
+Qed.
+
+Lemma mod2n: forall n,
+mod2 (n + n) = false.
+Proof. intro n.
+       induction n as [ | xn IHn ]; intros.
+       - now simpl.
+       - simpl. assert ((xn + (S xn))%nat = (S (xn + (xn)))%nat) by now simpl.
+         now rewrite H.
+Qed.
+
+Lemma mod2Sn2: forall (a b n: nat),
+(a + a + (b + b))%nat = S n ->
+mod2 n = true.
+Proof. intro a.
+       induction a as [ | xa IHa ]; intros.
+       - case_eq b; intros.
+         + simpl in *. subst.  simpl in *. now contradict H.
+         + simpl in *. subst. simpl in *. inversion H.
+           assert ((n0 + S n0)%nat = (S (n0 + n0))%nat) by now simpl.
+           now rewrite mod2Sn.
+       - case_eq n; intros. subst. contradict H. lia.
+         rewrite <- H0. 
+         apply (IHa (S b)). rewrite <- H. lia.
+Qed.
+
+Lemma mod2Sn1: forall (a n: nat),
+(a + a)%nat = S n ->
+mod2 n = true.
+Proof. intro a.
+       induction a as [ | xa IHa ]; intros.
+       - simpl in *. now contradict H.
+       - simpl in *. inversion H.
+           assert ((xa + S xa)%nat = (S (xa + xa))%nat) by now simpl.
+           now rewrite mod2Sn.
+Qed.
+
+Lemma mod2Sn1': forall (a n: nat),
+(a + a)%nat = n ->
+mod2 n = false.
+Proof. intro a.
+       induction a as [ | xa IHa ]; intros.
+       - simpl in *. rewrite <- H. now simpl.
+       - simpl in *. inversion H. simpl.
+           assert ((xa + S xa)%nat = (S (xa + xa))%nat) by now simpl.
+           rewrite H1.
+           now rewrite mod2n.
+Qed.
+
+Lemma mod2n2: forall (a b n: nat),
+(a + a + (b + b))%nat = n ->
+mod2 n = false.
+Proof. intro a.
+       induction a as [ | xa IHa ]; intros.
+       - case_eq b; intros.
+         + simpl in *. subst.  simpl in *. easy.
+         + simpl in *. subst. simpl in *.
+           assert ((n0 + S n0)%nat = (S (n0 + n0))%nat) by now simpl.
+           rewrite H.
+           now rewrite mod2n.
+       - case_eq n; intros. subst. lia.
+         rewrite <- H0. 
+         apply (IHa (S b)). rewrite <- H. lia.
+Qed.
+
+
+Lemma helper_div: forall a n,
+(a + a)%nat = S n ->
+a = S (Nat.div2 n).
+Proof. intro a.
+       induction a as [ | xa IHa ]; intros.
+       - simpl in *. now contradict H.
+       - simpl in *. inversion H. apply f_equal. 
+         case_eq xa; intros. now simpl.
+         simpl. assert ((n0 + S (S n0))%nat = (S (n0 + (S n0)))%nat) by now simpl.
+         rewrite H2, <- H0. apply IHa. lia.
+Qed.
+
+Lemma helper_div2: forall a b n,
+ (a + a + (b + b))%nat = S n
+-> 
+(a + b)%nat = (S (Nat.div2 n)).
+Proof. intro a.
+       induction a as [ | xa IHa ]; intros.
+       - simpl in *. now apply helper_div.
+       - simpl in *. inversion H.
+         case_eq b; intros. subst. simpl in *.
+         assert ( (S (xa + 0)) = (xa + S 0)%nat) by now simpl.
+         rewrite H0. apply IHa. simpl. lia.
+         assert ((S (xa + S n0))%nat =  (xa + (S (S n0)))%nat ) by now simpl.
+         rewrite H2. apply IHa. lia.
+Qed.
+
+Theorem mod2_S_double : forall n, mod2 (S (2 * n)) = true.
+  induction n; simpl; intuition; rethink.
+Qed.
+
+Theorem mod2_double : forall n, mod2 (2 * n) = false.
+  induction n; simpl; intuition; rewrite <- plus_n_Sm; rethink.
+Qed.
+
+Theorem div2_odd' : forall n:nat,
+  mod2 n = true
+  -> n = S (2 * div2 n).
+  induction n using strong; simpl; intuition.
+
+  destruct n; simpl in *; intuition.
+    discriminate.
+  destruct n; simpl in *; intuition.
+  do 2 f_equal.
+  replace ((div2 n)%nat + S (div2 n + 0))%nat with (S (div2 n + (div2 n + 0))); auto.
+Qed.
+
+Theorem div2_even' : forall n,
+  mod2 n = false
+  -> (n = 2 * div2 n)%nat.
+  induction n using strong; simpl; intuition.
+
+  destruct n; simpl in *; intuition.
+  destruct n; simpl in *; intuition.
+    discriminate.
+  f_equal.
+  replace (div2 n + S (div2 n + 0))%nat with (S (div2 n + (div2 n + 0))); auto.
+Qed.
+
+
+Lemma modtf: forall n,
+mod2 (2 * n) = false.
+Proof. induction n; intros. 
+       now simpl. simpl.
+       assert ((n + S (n + 0))%nat = (S (n + (n + 0)))%nat ) by now simpl.
+       rewrite H. now simpl in IHn.
+Qed.
+
+Lemma modStf: forall n,
+mod2 (S n) = true -> mod2 n = false.
+Proof.  induction n; intuition.
+        apply div2_odd' in H. inversion H.
+        rewrite plus_0_r. simpl.
+        assert ((Nat.div2 n + S (Nat.div2 n))%nat = (S (Nat.div2 n + (Nat.div2 n)))%nat) by now simpl.
+        rewrite H0.
+        assert ((Nat.div2 n + Nat.div2 n)%nat = (2 * (Nat.div2 n))%nat).
+        { simpl. now rewrite plus_0_r. }
+        rewrite H2. apply modtf.
+Qed.
+
+Lemma modSft: forall n,
+mod2 (S n) = false -> mod2 n = true.
+Proof.  induction n; intuition.
+        apply div2_even' in H. inversion H.
+        rewrite plus_0_r in H1. rewrite H1. simpl.
+        assert ((Nat.div2 n + S (Nat.div2 n))%nat = (S (Nat.div2 n + (Nat.div2 n)))%nat) by now simpl.
+        rewrite H0. simpl.
+        case_eq ((Nat.div2 n + Nat.div2 n)%nat ); intros.
+        easy. now apply mod2Sn1 in H2.
+Qed.
+
+Lemma div2nSn: forall n,
+mod2 n = false ->
+(Nat.div2 n) = (Nat.div2 (S n)).
+Proof. intros. apply div2_even' in H.
+       now rewrite H, Nat.div2_succ_double, Nat.div2_double.
+Qed.
+
+Lemma div2nSn': forall n,
+mod2 n = true ->
+S (Nat.div2 n) = (Nat.div2 (S n)).
+Proof. intros. apply div2_odd' in H.
+       rewrite H. rewrite !Nat.div2_succ_double. simpl.
+       apply f_equal. rewrite plus_0_r.
+       assert ((Nat.div2 n + Nat.div2 n)%nat = (2 * Nat.div2 n)%nat ) by lia.
+       now rewrite H0, Nat.div2_double.
+Qed.
+
+Lemma helper_conv_f2: forall a b,
+(length a = length b) ->
+RAWBITVECTOR_LIST.add_list_ingr (natTolist (Datatypes.length a) (listTonat a + listTonat b))
+  (natTolist (Datatypes.length a) 1) false =
+natTolist (Datatypes.length a) (S (listTonat a + listTonat b)).
+Proof. intro a.
+       induction a as [ | xa xsa IHa ]; intros.
+       - now simpl.
+       - case_eq b; intros. subst. now contradict H.
+         case_eq xa; case_eq b0; intros.
+         + simpl. rewrite !plus_0_r.
+           assert ( (listTonat xsa + listTonat xsa + S (listTonat l + listTonat l))%nat
+                   =
+                    S (listTonat xsa + listTonat xsa + (listTonat l + listTonat l))%nat) by now simpl.
+           rewrite H3, natmod2', natdiv2''. simpl.
+           case_eq ( (listTonat xsa + listTonat xsa + (listTonat l + listTonat l))%nat); intros.
+           apply f_equal.
+           rewrite nlf,  RAWBITVECTOR_LIST.add_list_carry_empty_neutral_n_r.
+           apply empty_total in H4. now rewrite H4.
+           rewrite len_n2l; lia.
+           
+           assert (mod2 n  = true).
+           { now apply (@mod2Sn2 (listTonat xsa) (listTonat l)). } 
+           rewrite H5. apply f_equal.
+           rewrite nlf, RAWBITVECTOR_LIST.add_list_carry_empty_neutral_n_r.
+           apply helper_div2 in H4. now rewrite H4.
+           rewrite len_n2l; lia.
+         + simpl. rewrite !plus_0_r.
+           case_eq ( (listTonat xsa + listTonat xsa + (listTonat l + listTonat l))%nat); intros.
+           simpl. apply f_equal.
+           rewrite helper_conv_tf, nlf, RAWBITVECTOR_LIST.add_list_carry_empty_neutral_n_l.
+           reflexivity. rewrite len_n2l; lia.
+           assert (mod2 (S n)  = false).
+           { now apply mod2n2 in H3. }
+           rewrite H4. simpl.
+           assert (mod2 n  = true).
+           { now apply mod2Sn2 in H3. }
+           rewrite H5. simpl.
+           apply f_equal.
+           case_eq n; intros. subst. now contradict H3.
+           specialize (helper_conv_tf (natTolist (Datatypes.length xsa) (S (Nat.div2 (S n0))))
+                      (Datatypes.length xsa)); intros.
+           rewrite H0 in H. inversion H. rewrite H7.
+           apply helper_div2 in H3. rewrite H6 in H3. rewrite <- H3.
+           rewrite IHa, H3.
+           assert (mod2 n0 = false).
+           { rewrite H6 in H5. now apply modStf in H5. }
+           apply div2nSn in H8. now rewrite H8. easy.
+         + simpl. rewrite !plus_0_r, natmod2''. simpl.
+           assert ((listTonat xsa + listTonat xsa + S (listTonat l + listTonat l))%nat
+                   =
+                  S (listTonat xsa + listTonat xsa + (listTonat l + listTonat l))%nat) by now simpl.
+           rewrite H3, natmod2'. apply f_equal.
+           rewrite <- H3, natmod2''', natdiv2''.
+           rewrite helper_conv_tf, IHa. reflexivity.
+           now rewrite H0 in H; simpl in H; inversion H.
+         + simpl. rewrite !plus_0_r, natmod2', natdiv2''. simpl.
+           case_eq ((listTonat xsa + listTonat xsa + (listTonat l + listTonat l))%nat); intros.
+           apply f_equal.
+           apply empty_total in H3. now rewrite H3, nlf, mlf.
+           assert (mod2 n  = true).
+           { now apply mod2Sn2 in H3. }
+           rewrite H4. simpl.
+           apply f_equal.
+           rewrite nlf, RAWBITVECTOR_LIST.add_list_carry_empty_neutral_n_r.
+           apply helper_div2 in H3. now rewrite H3.
+           rewrite len_n2l; lia.
+Qed.
+
+Lemma helper_conv_f: forall a b,
+(length a = length b) ->
+RAWBITVECTOR_LIST.add_list_ingr a b false =
+natTolist (length a) (listTonat a + listTonat b). 
+Proof.
+    intro a.
+    induction a as [ | xa xsa IHa ]; intros.
+    - now simpl.
+    - case_eq b; intros. subst. now contradict H.
+      simpl. rewrite !plus_0_r.
+      case_eq xa; case_eq b0; intros; simpl.
+      assert ((listTonat xsa + listTonat xsa + S (listTonat l + listTonat l))%nat =
+              S (listTonat xsa + listTonat xsa + (listTonat l + listTonat l))%nat)
+      by now simpl. rewrite H3.
+      rewrite natmod2'. apply f_equal.
+      rewrite H0 in H. simpl in H. inversion H.
+      specialize (IHa l H5). rewrite natdiv2''.
+      rewrite helper_conv_tf2.
+      rewrite <- (@RAWBITVECTOR_LIST.add_list_carry_assoc 
+         xsa l (natTolist (Datatypes.length xsa) 1) false false false false).
+      rewrite IHa. simpl.
+      now rewrite helper_conv_f2. easy. now inversion H.
+      specialize (IHa l). rewrite IHa.
+      case_eq ((listTonat xsa + listTonat xsa + (listTonat l + listTonat l))%nat); intros.
+      apply f_equal.
+      assert ((listTonat xsa + listTonat l)%nat = 0)%nat.
+      { now apply empty_total in H3. }
+      now rewrite H4.
+      assert (mod2 n = true).
+      { now apply mod2Sn2 in H3. } 
+      rewrite H4. apply f_equal.
+ 
+      assert ((S (Nat.div2 n)) = (listTonat xsa + listTonat l)%nat).
+      { now apply helper_div2 in H3. } 
+      now rewrite H5. rewrite H0 in H. simpl in H. now inversion H.
+      rewrite natmod2''. apply f_equal.
+      rewrite H0 in H. simpl in H. inversion H.
+      specialize (IHa l H4). 
+      now rewrite natmod2'''.
+      rewrite natmod2'. apply f_equal.
+      rewrite H0 in H. simpl in H. inversion H.
+      specialize (IHa l H4). 
+      now rewrite natdiv2''.
+Qed.
+
+Lemma helper_conv_t: forall a b,
+(length a = length b) ->
+RAWBITVECTOR_LIST.add_list_ingr a b true =
+natTolist (Datatypes.length a) (S (listTonat a + listTonat b)).
+Proof. intro a.
+       induction a as [ | xa xsa IHa ]; intros.
+       - now simpl.
+       - case_eq b; intros. subst. now contradict H.
+         simpl. rewrite !plus_0_r.
+      case_eq xa; case_eq b0; intros; simpl.
+      rewrite natmod2''. apply f_equal.
+      rewrite H0 in H. simpl in H. inversion H.
+      specialize (IHa l H4). now rewrite natmod2'''.
+      specialize (IHa l). rewrite IHa.
+      case_eq ((listTonat xsa + listTonat xsa + (listTonat l + listTonat l))%nat); intros.
+      apply f_equal.
+      assert ((listTonat xsa + listTonat l)%nat = 0)%nat.
+      { now apply empty_total in H3. }
+      now rewrite H4.
+      assert (mod2 (S n) = false).
+      { now apply mod2n2 in H3. } 
+      rewrite H4. apply f_equal.
+ 
+      assert ((Nat.div2 (S n)) = (listTonat xsa + listTonat l)%nat).
+      { apply helper_div2 in H3. rewrite H3. now apply div2nSn. }
+      now rewrite H5. rewrite H0 in H. simpl in H. now inversion H.
+      assert ((listTonat xsa + listTonat xsa + S (listTonat l + listTonat l))%nat
+              =
+              S (listTonat xsa + listTonat xsa + (listTonat l + listTonat l))%nat)
+      by now simpl. rewrite H3.
+      rewrite natmod2'. apply f_equal.
+      rewrite H0 in H. simpl in H. inversion H.
+      specialize (IHa l H5). 
+      now rewrite natdiv2''.
+      case_eq ((listTonat xsa + listTonat xsa + (listTonat l + listTonat l))%nat); intros.
+      apply f_equal.
+      apply empty_total in H3. rewrite nlf.
+      apply empty_total2 in H3. destruct H3 as (H3a, H3b).
+      apply lnf in H3a. apply lnf in H3b.
+      rewrite H3a, H3b. rewrite H0 in H. inversion H. 
+      now rewrite H4, mlf, RAWBITVECTOR_LIST.length_mk_list_false.
+
+      assert (mod2 n = true).
+      { now apply mod2Sn2 in H3. }
+      rewrite H4. apply f_equal.
+      assert ( (S (Nat.div2 n)) = (listTonat xsa + listTonat l)%nat).
+      { apply helper_div2 in H3. now rewrite H3. } 
+      rewrite H5.
+      rewrite H0 in H. simpl in H. inversion H.
+      specialize (IHa l H7).
+      now rewrite helper_conv_f.
+Qed.
+
+Lemma helper_conv_tt_tt: forall a b,
+(length a = length b) ->
+RAWBITVECTOR_LIST.add_list (true :: true :: a) (true :: true :: b) =
+false :: true :: natTolist (length a) (S (listTonat a + listTonat b)).
+Proof. 
+    intro a. 
+    induction a as [ | xa xsa IHa ]; intros.
+    - simpl in *. now compute.
+    - simpl. case_eq b ;intros. subst. now contradict H.
+      simpl. case_eq xa;  case_eq b0; intros. simpl. rewrite !plus_0_r, natmod2''.
+      specialize (IHa l). unfold RAWBITVECTOR_LIST.add_list in *. simpl in *.
+      repeat apply f_equal. rewrite H0 in H. simpl in H. inversion H.
+      specialize (IHa H4). inversion IHa. now rewrite natmod2'''.
+      rewrite !plus_0_r. simpl.
+       unfold RAWBITVECTOR_LIST.add_list in *. simpl in *.
+       rewrite natmod2'. repeat apply f_equal.
+       specialize (IHa l). rewrite H0 in H. simpl in H. inversion H.
+      specialize (IHa H4). inversion IHa. now rewrite natdiv2''.
+       rewrite !plus_0_r. simpl.
+       assert ((listTonat xsa + listTonat xsa + S (listTonat l + listTonat l))%nat
+              =
+              S (listTonat xsa + listTonat xsa + (listTonat l + listTonat l))%nat) by now simpl.
+       rewrite H3. rewrite natmod2', natdiv2''.
+       unfold RAWBITVECTOR_LIST.add_list in *. simpl in *.
+       repeat apply f_equal. 
+       rewrite H0 in H. simpl in H. inversion H.
+       now specialize (IHa l H5); inversion IHa.
+       rewrite !plus_0_r.
+       case_eq ((listTonat xsa + listTonat xsa + (listTonat l + listTonat l))%nat); intros.
+       unfold RAWBITVECTOR_LIST.add_list in *. simpl in *.
+       repeat apply f_equal. rewrite H0 in H. simpl in H. inversion H.
+       specialize (IHa l H5). inversion IHa.
+       assert ((listTonat xsa + listTonat l)%nat = O).
+       { now apply empty_total in H3. }
+       rewrite H4 in H6.
+       assert (xsa = RAWBITVECTOR_LIST.mk_list_false (length xsa)).
+       { apply empty_total in H3. apply empty_total2 in H3.
+         destruct H3 as (H3a, H3b). now apply lnf in H3a. }
+       rewrite H7, H5.
+       assert (l = RAWBITVECTOR_LIST.mk_list_false (length l)).
+       { apply empty_total in H3. apply empty_total2 in H3.
+         destruct H3 as (H3a, H3b). now apply lnf in H3b. }
+       rewrite H8.
+       rewrite !RAWBITVECTOR_LIST.length_mk_list_false. now rewrite nlf, mlf.
+       unfold RAWBITVECTOR_LIST.add_list in *. simpl in *.
+       assert (mod2 n = true).
+       { now apply mod2Sn2 in H3. } 
+       rewrite H4. repeat apply f_equal. rewrite H0 in H. simpl in H. inversion H.
+       specialize (IHa l H6). inversion IHa.
+       assert ((S (Nat.div2 n)) = (listTonat xsa + listTonat l)%nat).
+       { apply helper_div2 in H3. now rewrite H3. }
+       rewrite H5.
+       now rewrite helper_conv_f.
+Qed.
+
+(** prove *)
+Lemma helper_conv_tt: forall a b,
+(length a = length b) ->
+RAWBITVECTOR_LIST.add_list (true :: a) (true :: b) =
+mod2 (listTonat a + listTonat a + (listTonat b + listTonat b))
+:: natTolist (Datatypes.length a)
+     (S (Nat.div2 (listTonat a + listTonat a + (listTonat b + listTonat b)))).
+Proof. 
+    intro a.
+    induction a  as [ | xa xsa IHa ]; intros.
+    - simpl in *. symmetry in H. rewrite empty_list_length in H; subst. now simpl.
+    - case_eq b; intros.
+      + subst. now contradict H.
+      + case_eq xa; case_eq b0; intros.
+        rewrite helper_conv_tt_tt. simpl.
+        assert (  (listTonat xsa + (listTonat xsa + 0) + S (listTonat xsa + (listTonat xsa + 0)) +
+                  S (listTonat l + (listTonat l + 0) + S (listTonat l + (listTonat l + 0))))%nat
+               = 
+                 S (listTonat xsa + (listTonat xsa + 0) + S (listTonat xsa + (listTonat xsa + 0)) +
+                  (listTonat l + (listTonat l + 0) + S (listTonat l + (listTonat l + 0))))%nat) 
+        by now simpl.
+        rewrite H3. now rewrite !plus_0_r, moddiv2, natdiv2, natmod2 in *.
+        rewrite H0 in H. simpl in H. now inversion H.
+Admitted.
+
+
+(** prove *)
+Lemma mod2_3: forall a b,
+mod2 (listTonat a + listTonat a + S (listTonat a + listTonat a) + (listTonat b + listTonat b))
+= true.
+Admitted.
+
+(** prove *)
+Lemma div2_3: forall a b,
+     (Nat.div2
+        (listTonat a + listTonat a + S (listTonat a + listTonat a) + (listTonat b + listTonat b)))
+        =
+     (listTonat a + listTonat a + listTonat b)%nat.
+Admitted.
+
+(** prove *)
+Lemma mod2_4: forall a b,
+mod2 (listTonat a + listTonat a + (listTonat a + listTonat a) + (listTonat b + listTonat b))
+= false.
+Admitted.
+
+(** prove *)
+Lemma div2_4: forall a b,
+     (Nat.div2
+        (listTonat a + listTonat a + (listTonat a + listTonat a) + (listTonat b + listTonat b)))
+        =
+     (listTonat a + listTonat a + listTonat b)%nat.
+Admitted.
+
+Lemma empty_total3: forall a b: nat,
+(a + a + (a + a) + (b + b))%nat = 0%nat
+->
+(a + a + b)%nat = 0%nat.
+Proof. intro a.
+       induction a as [ | xa IHa ]; intros; lia.
+Qed.
+
+Lemma helper_div2_3: forall a b n,
+ (a + a + (a + a) + (b + b))%nat = S n
+-> 
+(a + a + b)%nat = (S (Nat.div2 n)).
+Proof. intro a.
+       induction a as [ | xa IHa ]; intros.
+       - simpl in *. now apply helper_div.
+       - simpl in *. inversion H.
+         case_eq b; intros. subst. simpl in *.
+         assert ( (S (xa + S xa + 0)) = ( (xa + xa + 2))%nat).
+         { rewrite plus_0_r. lia. }
+         rewrite H0. rewrite plus_0_r. apply IHa. simpl. lia.
+         assert ((S (xa + S xa + S n0))%nat =  (xa + xa + (S (S (S n0))))%nat ).
+         { simpl. lia. }
+         rewrite H2. apply IHa. lia.
+Qed.
+
+
+
+Lemma mod2Sn3: forall (a b n: nat),
+(a + a + (a + a) + (b + b))%nat = S n ->
+mod2 n = true.
+Proof. intro a.
+       induction a as [ | xa IHa ]; intros.
+       - case_eq b; intros.
+         + simpl in *. subst.  simpl in *. now contradict H.
+         + simpl in *. subst. simpl in *. inversion H.
+           assert ((n0 + S n0)%nat = (S (n0 + n0))%nat) by now simpl.
+           now rewrite mod2Sn.
+       - case_eq n; intros. subst. contradict H. lia.
+         rewrite <- H0. 
+         apply (IHa (S ( S b))). rewrite <- H. lia.
+Qed.
+
+
+Lemma ntl_t: forall (a b: list bool) n,
+true :: natTolist n (listTonat a + listTonat b) =
+natTolist (S n) (S (listTonat a + listTonat a + (listTonat b + listTonat b))).
+Proof. intro a.
+       induction a as [ | xa xsa IHa ]; intros.
+       - simpl.
+         case_eq ((listTonat b + listTonat b)%nat); intros.
+         apply empty_total2 in H. destruct H as (Ha, Hb).
+         now rewrite Ha.
+         pose proof H as Hp.
+         apply helper_div in H. rewrite H.
+         apply mod2Sn1 in Hp. rewrite Hp; auto.
+       - case_eq xa; intros. simpl. rewrite !plus_0_r.
+         rewrite mod2_3. apply f_equal. now rewrite div2_3.
+         simpl. rewrite !plus_0_r.
+         case_eq (  (listTonat xsa + listTonat xsa + (listTonat xsa + listTonat xsa) + (listTonat b + listTonat b))%nat); intros.
+         apply empty_total3 in H0. now rewrite H0.
+         pose proof H0 as H0p.
+         apply helper_div2_3 in H0. rewrite H0.
+         apply mod2Sn3 in H0p. now rewrite H0p.
+Qed.
+
+Lemma ntl_f: forall (a b: list bool) n,
+false :: natTolist n (listTonat a + listTonat b) =
+natTolist (S n) (listTonat a + listTonat a + (listTonat b + listTonat b)).
+Proof. intro a.
+       induction a as [ | xa xsa IHa ]; intros.
+       - simpl.
+         case_eq ((listTonat b + listTonat b)%nat); intros.
+         apply empty_total2 in H. destruct H as (Ha, Hb).
+         now rewrite Ha.
+         pose proof H as Hp.
+         apply helper_div in H. rewrite H.
+         apply mod2Sn1' in Hp. rewrite Hp.
+         apply modSft in Hp.
+         apply div2nSn' in Hp. now rewrite Hp.
+       - case_eq xa; intros. simpl. rewrite !plus_0_r.
+         assert ((listTonat xsa + listTonat xsa + S (listTonat xsa + listTonat xsa) + (listTonat b + listTonat b))%nat
+                 =
+               (S (listTonat xsa + listTonat xsa + (listTonat xsa + listTonat xsa) + (listTonat b + listTonat b)))%nat).
+         { lia. } rewrite H0.
+         rewrite mod2_4. apply f_equal. now rewrite div2_4.
+         simpl. rewrite !plus_0_r.
+         now rewrite mod2_4, div2_4.
+Qed.
+
+Lemma toListsame: forall (a b: list bool) n,
+(length a = n) -> (length b = n) ->
+RAWBITVECTOR_LIST.add_list a b = natTolist n ((listTonat a) + (listTonat b)).
+Proof. intro a.
+       induction a as [ | xa xsa IHa ]; intros.
+       - simpl in *. rewrite <- H in *. rewrite empty_list_length in H0; subst.
+         simpl. now rewrite RAWBITVECTOR_LIST.add_list_empty_r.
+       - case_eq b; intros. subst. now contradict H0.
+         simpl.
+         case_eq xa; case_eq b0; intros; simpl.
+         assert ( (listTonat xsa + 0)%nat =  (listTonat xsa)).
+         { now rewrite plus_n_O. }
+          assert ( (listTonat l + 0)%nat =  (listTonat l)).
+         { now rewrite plus_n_O. }
+         rewrite H4, H5.
+         case_eq n; intros. subst. now contradict H6.
+         simpl.
+         case_eq ( (listTonat xsa%nat + listTonat xsa + 
+         S (listTonat l + listTonat l))%nat); intros.
+         simpl. contradict H7. lia.
+         rewrite helper_conv_tt.
+         assert ( (listTonat xsa + listTonat xsa + S (listTonat l + listTonat l))%nat
+                  =
+                   (S (listTonat xsa + listTonat xsa + (listTonat l + listTonat l))%nat)) by now simpl.
+         rewrite H8 in H7. inversion H7. rewrite H10.
+         rewrite H6 in H. inversion H. now rewrite H11.
+         subst. now inversion H0.
+         rewrite RAWBITVECTOR_LIST.add_list_carry_tf_t.
+         rewrite (IHa l (n-1)%nat), !plus_0_r.
+         rewrite ntl_t.
+         assert ((S (n - 1)) = n) .
+         { case_eq n; intros. subst. now contradict H4. lia. }
+         now rewrite H4.
+         simpl in H. rewrite <- H. simpl. lia.
+         rewrite H1 in H0. 
+         simpl in H0. rewrite <- H0. simpl. lia.
+
+         rewrite RAWBITVECTOR_LIST.add_list_carry_ft_t.
+         rewrite (IHa l (n-1)%nat), !plus_0_r.
+         rewrite ntl_t.
+         assert ((S (n - 1)) = n) .
+         { case_eq n; intros. subst. now contradict H4. lia. }
+         rewrite H4.
+         assert ( (listTonat xsa + listTonat xsa + S (listTonat l + listTonat l))%nat
+                  =
+                (S (listTonat xsa + listTonat xsa + (listTonat l + listTonat l)))) by now simpl.
+         now rewrite H5.
+         simpl in H. rewrite <- H. simpl. lia.
+         rewrite H1 in H0. 
+         simpl in H0. rewrite <- H0. simpl. lia.
+
+         rewrite RAWBITVECTOR_LIST.add_list_carry_ff_f.
+         rewrite (IHa l (n-1)%nat), !plus_0_r.
+         rewrite ntl_f.
+         assert ((S (n - 1)) = n) .
+         { case_eq n; intros. subst. now contradict H4. lia. }
+         now rewrite H4.
+         simpl in H. rewrite <- H. simpl. lia.
+         rewrite H1 in H0. 
+         simpl in H0. rewrite <- H0. simpl. lia.
+Qed.
+
+(** prove *)
+Lemma equiv_ltnatN: forall a b,
+(length a = length b) ->
+natTolist (length a) (listTonat a + listTonat b) = NToList (listToN a + listToN b) (length a).
+Proof. intro a.
+       induction a as [ | xa xsa IHa ]; intros.
+       - simpl. simpl in H. symmetry in H. rewrite empty_list_length in H. rewrite H.
+         now simpl.
+       - case_eq b; intros.
+         + subst. now contradict H.
+         + simpl. case_eq xa; case_eq b0; intros.
+           rewrite !plus_0_r. simpl.
+           assert ((listTonat xsa + listTonat xsa + S (listTonat l + listTonat l))%nat
+                   =
+                   (S (listTonat xsa + listTonat xsa + (listTonat l + listTonat l))%nat) ) by now simpl.
+           rewrite H3.
+Admitted.
+
+Lemma _toWordsame: forall n (a b: list bool),
+(length a = n) -> (length b = n) ->
+RAWBITVECTOR_LIST.add_list a b = NToList (Nplus (listToN a) (listToN b)) n.
+Proof. intros. specialize (@toListsame a b n H H0); intros. 
+       rewrite H1, <- H. rewrite equiv_ltnatN. reflexivity.
+       subst. easy.
+Qed.
+
+Lemma toWordsame2: forall n (a b: list bool),
+(length a = n) -> (length b = n) ->
+ListToword (RAWBITVECTOR_LIST.add_list a b) n = ListToword (NToList (Nplus (listToN a) (listToN b)) n) n.
+Proof. intros. rewrite (@_toWordsame n a b); easy. Qed.
+
+Lemma asd: forall a,
+(wordToN (ListToword a (length a)))
+=
+listToN a.
+Proof. intro a.
+       induction a as [ | xa xsa IHa]; intros.
+       - now simpl.
+       - simpl. case_eq xa; intros.
+         simpl. specialize (helper_strong xsa true); intros.
+         rewrite H0. simpl. rewrite IHa.
+         case_eq (listToN xsa ); intros; easy.
+         specialize (helper_strong xsa false); intros.
+         rewrite H0. simpl. rewrite IHa.
+         case_eq (listToN xsa ); intros; easy.
+Qed.
+
+Lemma wlf: forall n,
+wzero' n = ListToword (RAWBITVECTOR_LIST.mk_list_false n) n.
+Proof. intro n.
+       induction n as [ | xn IHn]; intros.
+       - simpl. now compute.
+       - simpl. specialize (helper_strong (RAWBITVECTOR_LIST.mk_list_false xn) false); intros.
+         rewrite RAWBITVECTOR_LIST.length_mk_list_false in H.
+         rewrite H. now rewrite <- IHn.
+Qed.
+
+Lemma length_pos: forall p n,
+(Datatypes.length (posToList n p)) = n.
+Proof. intro p.
+       induction p; intros.
+       - simpl. case_eq n; intros.
+         + easy.
+         + simpl. now rewrite IHp. 
+       - simpl. case_eq n; intros.
+         + easy.
+         + simpl. now rewrite IHp.
+       - simpl. case_eq n; intros.
+         + easy.
+         + simpl. now rewrite RAWBITVECTOR_LIST.length_mk_list_false.
+Qed.
+
+Lemma wzmlf: forall n,
+(wzero' n) = (ListToword (RAWBITVECTOR_LIST.mk_list_false n) n).
+Proof. intro n.
+       induction n as [ | xn IHn ]; intros.
+       - simpl. now compute.
+       - simpl. rewrite IHn.
+         specialize (helper_strong ( RAWBITVECTOR_LIST.mk_list_false xn) false); intros.
+         rewrite RAWBITVECTOR_LIST.length_mk_list_false in H. now rewrite H.
+Qed.
+
+Lemma wlp: forall n a,
+posToWord n a = ListToword (posToList n a) n.
+Proof. intro n.
+       induction n; intros.
+       - simpl. case_eq a; intros. simpl. now compute.
+         simpl. now compute. simpl. now compute.
+       - case_eq a; intros.
+         + simpl. specialize (helper_strong (posToList n p) true); intros.
+           assert ((Datatypes.length (posToList n p)) = n).
+           { now rewrite length_pos. } 
+           rewrite H1 in H0. rewrite H0. now rewrite <- IHn.
+         + simpl. specialize (helper_strong (posToList n p) false); intros.
+           assert ((Datatypes.length (posToList n p)) = n).
+           { now rewrite length_pos. } 
+           rewrite H1 in H0. rewrite H0. now rewrite <- IHn.
+         + simpl. specialize (helper_strong (RAWBITVECTOR_LIST.mk_list_false n) true); intros.
+           rewrite RAWBITVECTOR_LIST.length_mk_list_false in H0.
+           now rewrite H0, wzmlf.
+Qed.
+
+Lemma word_same: forall a n,
+NToWord n a = ListToword (NToList a n) n.
+Proof. intro a.
+       induction a as [ | xa xsa IHa ]; intros.
+       - simpl. now rewrite wlf.
+       - simpl. now rewrite wlp.
+Qed. 
+
+Lemma toWordsame3: forall (a b: list bool) n,
+(length a = n) -> (length b = n) ->
+Word.wplus (ListToword a n) (ListToword b n)  = ListToword (RAWBITVECTOR_LIST.add_list a b) n.
+Proof. intros. unfold Word.wplus, wordBin.
+       rewrite toWordsame2. 
+       rewrite <- !asd, word_same. now rewrite H, H0.
+       easy. easy.
+Qed.
+
+
+Lemma ltw_same: forall a b n,
+a = b ->
+ListToword a n =
+ListToword b n. 
+Proof. intros. now rewrite H. Qed.
+
+Lemma check_add_wplus:forall bs1 bs2 bsres, 
   let n := length bsres in
   (length bs1 = n)%nat -> 
   (length bs2 = n)%nat -> 
-  check_add bs1 bs2 bsres c ->
-                      (Word.wplus (ListToword (map (Lit.interp rho) bs1) n) (ListToword (map (Lit.interp rho) bs2) n))
-                      =
-                      (ListToword (map (Lit.interp rho) bsres) n).
-Proof. intros. unfold n in *. 
-       now rewrite <- (@check_add_listword bs1 bs2 bsres c), check_add_word.
+  check_add bs1 bs2 bsres (Clit Lit._false) ->
+    (Word.wplus (ListToword (map (Lit.interp rho) bs1) n) (ListToword (map (Lit.interp rho) bs2) n))
+    =
+   (ListToword (map (Lit.interp rho) bsres) n).
+Proof. intros. rewrite toWordsame3.
+       rewrite <- H in H0. rewrite <- H. apply ltw_same.
+       specialize (@check_add_addlist bs1 bs2 bsres (N.of_nat n)); intros.
+       apply H2. now rewrite H.
+       now rewrite H0, H.
+       apply check_add_bvadd_length in H1.
+       destruct H1 as (H1a, H1b). rewrite H in H1a. now rewrite <- H1a.
+       easy.
+       rewrite map_length; easy. rewrite map_length; easy.
 Qed.
 
 Lemma valid_check_bbAdd s pos1 pos2 lres : C.valid rho (check_bbAdd s pos1 pos2 lres).
@@ -3416,7 +4409,7 @@ Proof.
       case_eq (t_form .[ Lit.blit lres]); try (intros; now apply C.interp_true).
       intros a bsres Heq8.
       case_eq (t_atom .[ a]); try (intros; now apply C.interp_true).
-      intros [ | | | | | | |[ A B | A| | | | ]|N|N|N|  ] a1' a2' Heq9;
+      intros [ | | | | | | |[ A B | A| | | | ]|N|N|N| | | | ] a1' a2' Heq9;
         try (intros; now apply C.interp_true).
 
       (* BVadd *)
@@ -3592,7 +4585,7 @@ Proof.
         destruct Heq11 as (Heq11 & Heq11r).
         rewrite Nat.eqb_eq in Heq11r.
  
-        specialize (@check_add_wplus bs1 bs2 bsres (Clit Lit._false)); intros.
+        specialize (@check_add_wplus bs1 bs2 bsres); intros.
         unfold wplus in *.
         assert (length bsres = n). 
         { apply check_add_bvadd_length in Heq11.
@@ -3727,7 +4720,7 @@ Proof.
 
         pose proof Heq11.
 
-        specialize (@check_add_wplus bs1 bs2 bsres (Clit Lit._false)); intros.
+        specialize (@check_add_wplus bs1 bs2 bsres); intros.
         unfold wplus in *.
         assert (length bsres = n). 
         { apply check_add_bvadd_length in Heq11.
@@ -3738,6 +4731,611 @@ Proof.
         now rewrite map_length in H100. now rewrite map_length in H102.
         exact Heq11.
 Qed. 
+
+
+
+Lemma sext_empty: forall l, (sextend_lit l 0) = l.
+Proof. intros; now unfold sextend_lit. Qed.
+
+Lemma _flsi_lit: forall i a, _false_list_lit a (S i) = Lit._false :: _false_list_lit a i.
+Proof. intro i.
+       induction i; intros.
+       - now simpl.
+       - rewrite IHi. now simpl.
+Qed. 
+
+Lemma _flsapp_lit: forall i, _false_list_lit [] i ++ [Lit._false] = Lit._false :: _false_list_lit [] i.
+Proof. intro i.
+       induction i; intros.
+       - now simpl.
+       - simpl. now rewrite IHi.
+Qed.
+
+Lemma _flslen_lit: forall i a, length (_false_list_lit a i) = ((length a) + i)%nat.
+Proof. intro i.
+       induction i; intros.
+       - simpl. lia.
+       - simpl. rewrite IHi. lia.
+Qed. 
+
+Lemma eqsext: forall i, (extend_lit [] i Lit._false) = (false_list_lit i).
+Proof. intro i.
+       induction i; simpl.
+       - now compute.
+       - rewrite IHi. simpl. unfold false_list_lit. now rewrite _flsapp_lit.
+Qed.
+
+Lemma sext_cons_f: forall i l,
+                  (map (Lit.interp rho) (sextend_lit (Lit._false :: l) i)) = 
+                  (Lit.interp rho (Lit._false)) :: (map (Lit.interp rho) (sextend_lit l i)).
+Proof. intro i.
+       induction i; intros.
+       - unfold sextend_lit. now simpl.
+       - unfold sextend_lit in *. simpl.
+         specialize (IHi l). simpl in *.
+         case_eq l; intros; subst. rewrite map_app, IHi. simpl.
+         admit.
+         rewrite map_app.
+         now rewrite IHi, map_app.
+Admitted.
+
+
+Lemma sext_cons: forall i l a,
+                  l <> [] ->
+                  (map (Lit.interp rho) (sextend_lit (a :: l) i)) = 
+                  (Lit.interp rho a) :: (map (Lit.interp rho) (sextend_lit l i)).
+Proof. intro i.
+       induction i; intros.
+       - unfold sextend_lit. now simpl.
+       - unfold sextend_lit in *. simpl.
+         specialize (IHi l a). simpl in *.
+         case_eq l; intros; subst. now contradict H.
+         rewrite map_app.
+         now rewrite IHi, map_app.
+Qed.
+
+
+Lemma len_lit: forall i, length (false_list_lit i) = i.
+Proof. intro i.
+       induction i; simpl.
+       - now simpl.
+      - unfold false_list_lit in IHi. now rewrite IHi.
+Qed. 
+
+Lemma sext_len: forall a i, (length (sextend_lit a i)) =  (length a + i)%nat.
+Proof. intros. unfold sextend_lit. 
+       case_eq a; intros; now rewrite ext_len.
+Qed.
+
+Lemma sextend_interp_len: forall bs1 bsres (i: nat),
+                           check_sextend bs1 bsres i = true ->
+                           length bsres = (length bs1 + i)%nat.
+Proof. intro bs1.
+       induction bs1; intros.
+       - simpl in *. unfold check_sextend in H.
+         case_eq (forallb2 eq_carry_lit (lit_to_carry (sextend_lit [] i)) bsres); intros.
+         apply prop_eq_carry_lit2 in H0.
+         rewrite prop_interp_carry3 in H0. 
+         assert (length (map (Lit.interp rho) (sextend_lit [] i)) = length (map (Lit.interp rho) bsres)).
+         { now rewrite H0. }
+         rewrite !map_length in H1. unfold sextend_lit in H1.
+         simpl in H1. now rewrite ext_len in H1.
+         rewrite H0 in H; now contradict H.
+       - simpl. unfold check_sextend in H.
+         case_eq ( forallb2 eq_carry_lit (lit_to_carry (sextend_lit (a :: bs1) i)) bsres); intros.
+         apply prop_eq_carry_lit2 in H0.
+         rewrite prop_interp_carry3 in H0.
+         assert (length (map (Lit.interp rho) (sextend_lit (a :: bs1) i)) = length (map (Lit.interp rho) bsres)).
+         { now rewrite H0. }
+         rewrite !map_length in H1. now rewrite sext_len in H1.
+         rewrite H0 in H; now contradict H.
+Qed.
+
+Lemma asd: forall a,
+wmsb (ListToword a (Datatypes.length a)) false = true -> a <> [].
+Proof. intro a.
+       induction a; intros.
+       - simpl in H. now contradict H.
+       - easy.
+Qed.
+
+Lemma last_cons: forall a i, last (i :: a) false = false -> last a false = false.
+Proof. intro a.
+       induction a; intros.
+       - now simpl.
+       - simpl in *. case_eq a0; intros; now subst.
+Qed.
+
+Lemma asd2: forall xl a, wmsb (ListToword [a; xl] 2) false = false -> xl = false.
+Proof. intros. case_eq a; case_eq xl; intros; subst; simpl in H; easy. Qed.
+
+Lemma asd2': forall xl a, wmsb (ListToword [(Lit.interp rho a); (Lit.interp rho xl)] 2) 
+false = false -> (Lit.interp rho xl) = false.
+Proof. intros. case_eq (Lit.interp rho a); case_eq (Lit.interp rho xl); intros; subst; simpl in H; try easy.
+rewrite H0, H1 in H. simpl in H. now contradict H.
+rewrite H0, H1 in H. simpl in H. now contradict H.
+Qed.
+
+Lemma asd3: forall xsl xl a,
+wmsb (ListToword (a :: xl :: xsl) (Datatypes.length (a :: xl :: xsl))) false = false ->
+wmsb (ListToword (xl :: xsl) (Datatypes.length (xl :: xsl))) false = false.
+Proof. intros. simpl in *.
+       specialize (@helper_strong (xl :: xsl) a); intros. simpl in H0.
+       rewrite H0 in H. simpl in H.
+       specialize (@helper_strong xsl xl); intros. simpl in H1.
+       rewrite H1 in *. now simpl in *.
+Qed.
+
+Lemma asd4: forall l a,
+ wmsb (ListToword (a :: l) (Datatypes.length (a :: l))) false = false ->
+ (last l false) = false.
+Proof. intro l.
+       induction l as [ | xl xsl IHl ]; intros.
+       - easy.
+       - simpl. case_eq xsl; intros; rewrite H0 in H. now apply asd2 in H.
+         rewrite <- H0 in *. apply (IHl xl). now apply asd3 in H.
+Qed.
+
+
+Lemma last_cons': forall {A} (xsl: list A) a xl c, last (a :: xl :: xsl) c  = last (xl :: xsl) c.
+Proof. intros A xsl.
+       case_eq xsl; intros.
+       - now simpl.
+       - simpl. case_eq l; intros; easy.
+Qed.
+
+Lemma wmsb1: forall a, wmsb (ListToword [Lit.interp rho a] 1) false = false ->
+Lit.interp rho a = false.
+Proof. intros.
+       specialize (@helper_strong [] (Lit.interp rho a)); intros. simpl in H0.
+       rewrite H0 in H. now simpl in H.
+Qed.
+
+Lemma asd5: forall l a,
+ wmsb (ListToword (map (Lit.interp rho) (a :: l)) (Datatypes.length (a :: l))) false = false ->
+ (last (a :: l) Lit._false) = Lit._false.
+Proof. intro l.
+       induction l as [ | xl xsl IHl ]; intros.
+       - simpl in *. admit.
+       - rewrite !map_cons in H. 
+         specialize (@asd3  (map (Lit.interp rho) xsl) (Lit.interp rho xl) (Lit.interp rho a)).
+         intros. simpl in H0. rewrite !map_length in H0.
+         apply H0 in H.
+         rewrite <- map_cons in H. specialize (IHl xl).
+         assert ((Datatypes.length (xl :: xsl)) = (S (Datatypes.length xsl))) by auto.
+         rewrite H1 in IHl. apply IHl in H. now rewrite (@last_cons' _lit xsl a xl (Lit._false)).
+Admitted.
+
+
+Lemma asd6': forall a,
+      wmsb (ListToword (map (Lit.interp rho) a) (Datatypes.length a)) false = false ->
+      (last (map (Lit.interp rho) a) false) = false.
+Proof. intro a.
+       induction a; intros.
+       - now simpl.
+       - case_eq a0; intros; rewrite H0 in *. simpl in *.
+         now apply wmsb1 in H.
+Admitted.
+
+Lemma asd6: forall a,
+      a <> [] -> 
+      wmsb (ListToword (map (Lit.interp rho) a) (Datatypes.length a)) false = false ->
+      (last a (Lit._false)) = Lit._false.
+Proof. intro a.
+       induction a; intros.
+       - now contradict H.
+       - now apply asd5 in H0.
+Qed.
+
+Lemma appsame: forall {A} (a: list A) c d, a ++ [c] = a ++ [d] -> c = d.
+Proof. intros A a.
+       induction a; intros.
+       - simpl in H. now inversion H.
+       - simpl in H. apply IHa. now inversion H.
+Qed.
+
+Lemma appsame2: forall {A} (a: list A) c d, (a ++ [c]) ++ [c] = (a ++ [d]) ++ [d]-> c = d.
+Proof. intros A a.
+       induction a; intros.
+       - simpl in H. now inversion H.
+       - simpl in H. apply IHa. now inversion H.
+Qed.
+
+Lemma appsame3: forall {A} (a: list A) c d, ((a ++ [c]) ++ [c]) ++ [c] = ((a ++ [d]) ++ [d]) ++ [d] -> c = d.
+Proof. intros A a.
+       induction a; intros.
+       - simpl in H. now inversion H.
+       - simpl in H. apply IHa. now inversion H.
+Qed.
+
+Lemma rlast: forall {A} (a b: list A), a = b -> removelast a = removelast b.
+Proof. intros A a.
+       induction a; intros; now subst.
+Qed.
+
+Lemma extlitcd3: forall i a c d,
+ ((extend_lit a i c ++ [c]) ++ [c]) ++ [c] = ((extend_lit a i d ++ [d]) ++ [d]) ++ [d] ->
+(extend_lit a i c ++ [c]) ++ [c] = (extend_lit a i d ++ [d]) ++ [d].
+Proof. intro i.
+       induction i; intros.
+       - simpl in *. now apply appsame3 in H; subst.
+       - simpl in *.
+         assert (
+         (removelast ((((extend_lit a i c ++ [c]) ++ [c]) ++ [c]) ++ [c])) =
+         (removelast ((((extend_lit a i d ++ [d]) ++ [d]) ++ [d]) ++ [d])) ) .
+         { specialize (@rlast _ ((((extend_lit a i c ++ [c]) ++ [c]) ++ [c]) ++ [c])
+                           ((((extend_lit a i d ++ [d]) ++ [d]) ++ [d]) ++ [d])).
+           intros. apply H0 in H. exact H. } rewrite !removelast_app in H0. simpl in H0.
+           now rewrite !app_nil_r in H0. easy. easy.
+Qed.
+
+
+Lemma extlitcd2: forall i a c d, 
+(extend_lit a i c ++ [c]) ++ [c] = (extend_lit a i d ++ [d]) ++ [d] ->
+(extend_lit a i c ++ [c]) = (extend_lit a i d ++ [d]).
+Proof. intro i.
+       induction i; intros.
+       - simpl in *. case_eq a; intros; subst; simpl in *; inversion H; try easy.
+         apply appsame2 in H1; now subst.
+       - simpl in *. now apply extlitcd3 in H.
+Qed.
+
+Lemma extlitcd: forall i a c d, extend_lit a (S i) c = extend_lit a (S i) d -> c = d.
+Proof. intro i.
+       induction i; intros.
+       - simpl in H. now apply (@appsame _ a).
+       - simpl in *. specialize (IHi a c d). apply extlitcd2 in H.
+         now apply IHi in H.
+Qed.
+
+Lemma extsamene: forall i a, i <> O -> 
+zextend_lit a i = sextend_lit a i ->
+zextend_lit a (S i) = sextend_lit a (S i).
+Proof. intros. unfold sextend_lit, zextend_lit in *. simpl in *.
+       induction i; intros.
+       - now contradict H.
+       - unfold sextend_lit, zextend_lit in *. simpl in *.
+         specialize (@extlitcd i a Lit._false  (last a Lit._false)); intros.
+         apply H1 in H0; now rewrite <- H0.
+Qed.
+
+Lemma wmsbne: forall a,
+      wmsb (ListToword (map (Lit.interp rho) a) (Datatypes.length a)) false = false ->
+      (last (map (Lit.interp rho) a) false) = false.
+Proof. intro a.
+       induction a; intros.
+       - now simpl.
+       - case_eq a0; intros. subst. simpl in *. now apply wmsb1 in H.
+         rewrite H0 in H. rewrite !map_cons in H. 
+         specialize (@asd3 (map (Lit.interp rho) l) (Lit.interp rho i) (Lit.interp rho a));
+           intros. simpl in H1, H. rewrite !map_length in H1. apply H1 in H.
+           rewrite <- map_cons in H. rewrite <- H0 in H.
+           assert ((S (Datatypes.length l)) =  (Datatypes.length a0)). 
+           { rewrite H0. now simpl. } rewrite H2 in H.
+           apply IHa in H. rewrite !map_cons.
+           rewrite (@last_cons' _ 
+             (map (Lit.interp rho) l) (Lit.interp rho a) (Lit.interp rho i) false).
+           now rewrite <- map_cons, <- H0.
+Qed.
+
+Fixpoint _ListToword_lit (a: list _lit) (n: nat): word n.
+Proof. case_eq a; intros.
+         case_eq n; intros.
+         + exact WO.
+         + exact (wzero (S n0)).
+         + case_eq n; intros.
+           - exact WO.
+           - case_eq (i == Lit._true); case_eq (i == Lit._false); intros.
+             exact (wzero (S n0)).
+             exact (@WS true _ (_ListToword_lit l n0)).
+             exact (@WS false _ (_ListToword_lit l n0)).
+             exact (@WS (Lit.interp rho i) _ (_ListToword_lit l n0)).
+Defined.
+
+Definition ListToword_lit (a: list _lit) (n: nat): word n :=
+  if Nat.eqb (length a) n then _ListToword_lit a n
+  else wzero n.
+  
+Fixpoint wmsb_lit sz (w : word sz) (a : _lit) : _lit :=
+  match w with
+    | WO => a
+    | @WS false _ x => wmsb_lit x Lit._false
+    | @WS true _ x => wmsb_lit x Lit._true
+  end.
+
+ Definition xx := [0; 1; 0; 1; 3].
+ Check xx.
+
+(*Compute ListToword_lit xx 5.*)
+
+Lemma _helper_strong_lit: forall n l i,
+(_ListToword_lit (i :: l) (S n)) =
+WS (Lit.interp rho i) (_ListToword_lit l n).
+Proof. intro n.
+       induction n; intros.
+       - case_eq (i == Lit._true); intros. simpl. rewrite H.
+         rewrite eqb_spec in H. rewrite H.
+         assert (Lit.interp rho Lit._true = true).
+         { specialize (Lit.interp_true rho wf_rho). intros.
+           apply H0. } now rewrite H0.
+         case_eq (i == Lit._false); intros.
+         simpl. rewrite H, H0.
+         rewrite eqb_spec in H0. rewrite H0.
+         assert (Lit.interp rho Lit._false = false).
+           { specialize (Lit.interp_false rho wf_rho). intros.
+              rewrite <- not_true_iff_false.
+              unfold not in *.
+              intros. now apply H1. } now rewrite H1.
+         simpl. rewrite H, H0.
+         assert ( (_ListToword_lit l 0) = WO).
+         { case_eq l; intros; now simpl. }
+         now rewrite H1.
+       - case_eq (i == Lit._true); intros. simpl. rewrite H.
+         rewrite eqb_spec in H. rewrite H. simpl.
+         assert (Lit.interp rho Lit._true = true).
+         { specialize (Lit.interp_true rho wf_rho). intros.
+           apply H0. } now rewrite H0.
+         case_eq (i == Lit._false); intros.
+         simpl. rewrite H, H0.
+         rewrite eqb_spec in H0. rewrite H0.
+         assert (Lit.interp rho Lit._false = false).
+           { specialize (Lit.interp_false rho wf_rho). intros.
+              rewrite <- not_true_iff_false.
+              unfold not in *.
+              intros. now apply H1. } now rewrite H1.
+         simpl. now rewrite H, H0.
+Qed.
+
+Lemma helper_strong_lit: forall l i,
+(ListToword_lit (i :: l) (S (length l))) =
+WS (Lit.interp rho i) (ListToword_lit l (length l)).
+Proof. intros. unfold ListToword_lit. rewrite !Nat.eqb_refl.
+       now rewrite _helper_strong_lit.
+Qed.
+
+Lemma interp_correct: forall a,
+(ListToword_lit a (Datatypes.length a)) =
+(ListToword (map (Lit.interp rho) a) (Datatypes.length a)).
+Proof. intro a.
+       induction a as [ | xa xsa IHa]; intros.
+       - now simpl.
+       - rewrite helper_strong_lit.
+         specialize (@helper_strong (map (Lit.interp rho) xsa) 
+         (Lit.interp rho xa) ); intros. rewrite !map_length in H. simpl. 
+         rewrite H. now rewrite IHa.
+Qed.
+
+
+Lemma asd62: forall a,
+      wmsb (ListToword_lit a (Datatypes.length a)) false = false ->
+      (last a (Lit._false)) = Lit._false.
+Proof. intro a.
+       induction a; intros.
+       - now simpl in *.
+       - 
+       
+       now apply asd5 in H0.
+Qed.
+
+Lemma wmsb_interp_correct_f: forall a,
+wmsb_lit (ListToword_lit a (Datatypes.length a)) false = false ->
+wmsb (ListToword (map (Lit.interp rho) a) (Datatypes.length a)) 
+(Lit.interp rho (Lit._false)) = (Lit.interp rho (Lit._false)).
+Proof. intros. rewrite <- interp_correct. admit.
+Admitted. 
+
+Lemma ltwlitf: forall a, wmsb_lit (ListToword_lit [a] 1) false = (Lit._false) ->
+a = Lit._false.
+Proof. intros. simpl in H.
+       rewrite helper_strong_lit in H. simpl in H.
+       case_eq (Lit.interp rho a); intros; rewrite H0 in H. now contradict H.
+ apply wmsb_interp_correct_f in H.
+       induction a; intros. simpl in *. unfold Lit._false. simpl. rewrite H.
+        
+     
+
+Lemma asd52: forall l a,
+ wmsb (ListToword_lit (a :: l) (Datatypes.length (a :: l))) false = false ->
+ (last (a :: l) Lit._false) = Lit._false.
+Proof. intro l.
+       induction l as [ | xl xsl IHl ]; intros.
+       - simpl in *. admit.
+       - rewrite !map_cons in H. 
+         specialize (@asd3  (map (Lit.interp rho) xsl) (Lit.interp rho xl) (Lit.interp rho a)).
+         intros. simpl in H0. rewrite !map_length in H0.
+         apply H0 in H.
+         rewrite <- map_cons in H. specialize (IHl xl).
+         assert ((Datatypes.length (xl :: xsl)) = (S (Datatypes.length xsl))) by auto.
+         rewrite H1 in IHl. apply IHl in H. now rewrite (@last_cons' _lit xsl a xl (Lit._false)).
+Admitted.
+
+
+
+Lemma extsame: forall i a,
+wmsb (ListToword_lit a (Datatypes.length a)) false = false -> 
+zextend_lit a i = sextend_lit a i.
+Proof. intro i.
+       induction i; intros.
+       - unfold zextend_lit, sextend_lit. now simpl.
+       - case_eq a; intros.  unfold zextend_lit, sextend_lit. now simpl.
+         apply asd6' in H. rewrite <- H0. unfold zextend_lit,sextend_lit.
+         simpl. now rewrite H.
+         now rewrite H0.
+Qed.
+
+  
+Lemma extsame: forall i a,
+wmsb (ListToword (map (Lit.interp rho) a) (Datatypes.length a)) false = false -> 
+zextend_lit a i = sextend_lit a i.
+Proof. intro i.
+       induction i; intros.
+       - unfold zextend_lit, sextend_lit. now simpl.
+       - case_eq a; intros.  unfold zextend_lit, sextend_lit. now simpl.
+         apply asd6' in H. rewrite <- H0. unfold zextend_lit,sextend_lit.
+         simpl. now rewrite H.
+         now rewrite H0.
+Qed.
+
+
+
+Lemma extsame: forall a i,
+wmsb (ListToword (map (Lit.interp rho) a) (Datatypes.length a)) false = false -> 
+zextend_lit a i = sextend_lit a i.
+Proof. intro a.
+       induction a as [ | xa xsa IHa]; intros.
+       - unfold zextend_lit, sextend_lit in *. now simpl.
+       - case_eq xsa; intros.
+         + unfold zextend_lit, sextend_lit in *. 
+           rewrite H0 in *. simpl in *. apply wmsb1 in H.
+           
+         +  
+ apply extsamene; try easy.
+       unfold zextend_lit, sextend_lit in *. simpl.
+        
+       induction i as [ | xi IHi ]; intros.
+       - unfold zextend_lit, sextend_lit. now simpl.
+       - simpl. case_eq a; intros. unfold zextend_lit, sextend_lit. now simpl.
+         apply IHi in H. unfold zextend_lit, sextend_lit in *. 
+         rewrite <- H0. simpl.
+         spe extlitcd in H.
+         
+          apply extsamene. easy. case_eq a; intros.  unfold zextend_lit, sextend_lit. now simpl.
+         apply IHi in H. unfold zextend_lit,sextend_lit in *. simpl.
+         
+          simpl.
+         apply asd6 in H. rewrite <- H0. unfold zextend_lit,sextend_lit.
+         simpl. now rewrite H.
+         now rewrite H0.
+Qed.
+
+
+Lemma extsame: forall i a,
+wmsb (ListToword (map (Lit.interp rho) a) (Datatypes.length a)) false = false -> 
+zextend_lit a i = sextend_lit a i.
+Proof. intro i.
+       induction i; intros.
+       - unfold zextend_lit, sextend_lit. now simpl.
+       - case_eq a; intros.  unfold zextend_lit, sextend_lit. now simpl.
+         apply asd6 in H. rewrite <- H0. unfold zextend_lit,sextend_lit.
+         simpl. now rewrite H.
+         now rewrite H0.
+Qed.
+
+Lemma asd7: forall a i,
+zextend_lit a i = sextend_lit a i ->
+wmsb (ListToword (map (Lit.interp rho) a) (Datatypes.length a)) false = false.
+Proof.
+    intro a.
+    induction a; intros.
+    - now simpl.
+    - simpl. unfold zextend_lit, sextend_lit in H.
+Admitted.
+
+
+Lemma exts: forall i a, zextend_lit a (S i) = sextend_lit a (S i) -> zextend_lit a i = sextend_lit a i.
+Proof. intros. apply extsame. now apply asd7 in H. Qed.
+
+
+Lemma extsame_cons: forall i a a0,
+zextend_lit a i = sextend_lit a i ->
+zextend_lit (a0 :: a) i = sextend_lit (a0 :: a) i.
+Proof. intro i.
+       induction i; intros.
+       - unfold zextend_lit, sextend_lit. now simpl.
+       - apply extsame. apply exts in H. apply (@asd7 (a0 :: a) i). now apply IHi.
+Qed.
+
+Lemma wmsb_cons: forall a i c,
+wmsb (ListToword (Lit.interp rho i :: map (Lit.interp rho) a) (S (Datatypes.length a))) c =
+true -> wmsb (ListToword (map (Lit.interp rho) a) (Datatypes.length a)) (Lit.interp rho i) = true.
+Proof. intros.
+         specialize (@helper_strong (map (Lit.interp rho) a) 
+         (Lit.interp rho i) ); intros. rewrite !map_length in H0. rewrite H0 in H.
+         simpl in H. easy.
+Qed.
+
+
+
+Lemma sextend_interp_main: forall bs1 bsres (i: nat),
+                           check_sextend bs1 bsres i = true ->
+                           Word.sext (ListToword (map (Lit.interp rho) bs1) (length bs1)) i  =
+                           ListToword (map (Lit.interp rho) bsres) ((length bs1) + i).
+Proof. intro bs1.
+       induction bs1 as [ | xbs1 xsbs1 IHbs1].
+       - intros. simpl.
+         unfold check_sextend in H. simpl in H.
+         case_eq (forallb2 eq_carry_lit
+          (lit_to_carry  (sextend_lit [] i)) bsres).
+         intros.
+         apply prop_eq_carry_lit2 in H0.
+         rewrite prop_interp_carry3 in H0.
+         simpl in H0. unfold sext. rewrite <- H0. simpl. unfold sextend_lit in *.
+         now rewrite wzeroi, !eqsext.
+
+         intros. rewrite H0 in H; now contradict H.
+       - intros. unfold sext, check_sextend in H.
+         case_eq (
+          forallb2 eq_carry_lit
+          (lit_to_carry
+             (sextend_lit (xbs1 :: xsbs1) i))
+          bsres); intros.
+         apply prop_eq_carry_lit2 in H0.
+         rewrite prop_interp_carry3 in H0. simpl.
+
+         unfold sext in *.         
+
+         case_eq (wmsb (ListToword (Lit.interp rho xbs1 :: 
+                 map (Lit.interp rho) xsbs1) (S (Datatypes.length xsbs1))) false); intros.
+         
+         specialize (@helper_strong (map (Lit.interp rho) xsbs1) 
+         (Lit.interp rho xbs1) ); intros. rewrite !map_length in H2. rewrite H2. simpl.
+
+         rewrite <- H0.
+         assert (wmsb (ListToword (Lit.interp rho xbs1 :: map (Lit.interp rho) xsbs1)
+           (S (Datatypes.length xsbs1))) false = true -> 
+           wmsb (ListToword (map (Lit.interp rho) xsbs1) (Datatypes.length xsbs1)) false 
+           = true).
+         { intros. admit. } apply H3 in H1. rewrite H1 in IHbs1. rewrite sext_cons.
+
+         rewrite (@IHbs1 (sextend_lit  xsbs1 i) i).
+         specialize (@helper_strong (map (Lit.interp rho) (sextend_lit xsbs1 i)) 
+         (Lit.interp rho xbs1) ); intros. rewrite !map_length in H4. rewrite sext_len in H4.
+         now rewrite H4. 
+
+         unfold check_sextend. now rewrite forallb_eqb_refl.
+         specialize (@asd (map (Lit.interp rho) xsbs1)); intros Hn. rewrite !map_length in Hn.
+         apply Hn in H1. case_eq xsbs1; intros; subst; try now contradict H1.
+
+         rewrite <- H0.
+         assert (wmsb (ListToword (Lit.interp rho xbs1 :: map (Lit.interp rho) xsbs1)
+           (S (Datatypes.length xsbs1))) false = false -> 
+           wmsb (ListToword (map (Lit.interp rho) xsbs1) (Datatypes.length xsbs1)) false = false).
+         { admit. } apply H2 in H1. rewrite H1 in IHbs1.
+
+         specialize (@helper_strong (map (Lit.interp rho) xsbs1) 
+         (Lit.interp rho xbs1) ); intros. rewrite !map_length in H3. rewrite H3.
+         
+         assert (Word.combine
+                (WS (Lit.interp rho xbs1) 
+                (ListToword (map (Lit.interp rho) xsbs1) (Datatypes.length xsbs1)))
+                (wzero i)
+                =
+                WS (Lit.interp rho xbs1)
+                (Word.combine (ListToword (map (Lit.interp rho) xsbs1)
+                (Datatypes.length xsbs1)) (wzero i))). { now simpl. }
+        rewrite H4.
+
+         rewrite (@IHbs1 (sextend_lit  xsbs1 i) i). simpl. apply (extsame i) in H1.
+         rewrite <- H1.
+         specialize (@extsame_cons i xsbs1 xbs1); intros.
+         apply H5 in H1. rewrite <- H1. rewrite zext_cons.
+         specialize (@helper_strong (map (Lit.interp rho) (zextend_lit xsbs1 i)) 
+         (Lit.interp rho xbs1) ); intros. rewrite !map_length in H6. rewrite zext_len in H6.
+         now rewrite H6.
+         unfold check_sextend. now rewrite forallb_eqb_refl.
+         rewrite H0 in H; now contradict H.
+Admitted.
+
 
 Lemma mk_list_false_eq: forall bs, (map (fun _ : int => Lit.interp rho Lit._false) bs) =
  (RAWBITVECTOR_LIST.mk_list_false (Datatypes.length bs)).
