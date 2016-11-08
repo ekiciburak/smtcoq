@@ -340,6 +340,8 @@ Definition whd sz (w : word (S sz)) : bool :=
     | @WS b _ _ => b
   end.
 
+Compute @whd 3 (WS false (WS false (WS true (WS false WO)))).
+
 Definition wtl sz (w : word (S sz)) : word sz :=
   match w in word sz' return match sz' with
                                | O => unit
@@ -348,6 +350,8 @@ Definition wtl sz (w : word (S sz)) : word sz :=
     | WO => tt
     | @WS _ _ w' => w'
   end.
+
+Compute @wtl 3 (WS false (WS false (WS true (WS false WO)))).
 
 Theorem WS_neq : forall b1 b2 sz (w1 w2 : word sz),
   (b1 <> b2 \/ w1 <> w2)
@@ -434,7 +438,9 @@ Proof.
     eapply Peano_dec.eq_nat_dec.
     split; intros; try congruence.
     inversion H0. apply eqb_false_iff in H. congruence. }
-Qed.    
+Qed.
+
+
 
 (** * Combining and splitting *)
 
