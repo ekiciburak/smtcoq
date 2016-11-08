@@ -833,12 +833,12 @@ Module Atom.
    | BO_BVor (_: nat)
    | BO_BVxor (_: nat)
    | BO_BVadd (_: nat)
+   | BO_BVmult (_: nat)
    | BO_BVconcat (n: nat) (_: nat)
    | BO_BVult (_: nat)
    | BO_BVslt (_: nat).
 (*
    | BO_BVsubst (_: N)
-   | BO_BVmult (_: N)
    | BO_select (_ : Typ.type) (_ : Typ.type)
    | BO_diffarray (_ : Typ.type) (_ : Typ.type)
 
@@ -910,9 +910,10 @@ Module Atom.
    | BO_BVconcat s1 s2, BO_BVconcat s3 s4 => Nat.eqb s1 s3 && Nat.eqb s2 s4
    | BO_BVult s1, BO_BVult s2 => Nat.eqb s1 s2
    | BO_BVslt s1, BO_BVslt s2 => Nat.eqb s1 s2
+   | BO_BVmult s1, BO_BVmult s2 => Nat.eqb s1 s2
 (*
    | BO_BVsubst s1, BO_BVsubst s2
-   | BO_BVmult s1, BO_BVmult s2 => N.eqb s1 s2
+
    | BO_select ti te, BO_select ti' te'
    | BO_diffarray ti te, BO_diffarray ti' te' => Typ.eqb ti ti' && Typ.eqb te te'
 *)
@@ -1016,8 +1017,8 @@ Module Atom.
 
   Lemma reflect_bop_eqb : forall o1 o2, reflect (o1 = o2) (bop_eqb o1 o2).
   Proof.
-    intros [ | | | | | | | A1 | s1 | s1 | s1 | s1 | s1 | s1 | s1  ]
-           [ | | | | | | | A2 | s2 | s2 | s2 | s2 | s2 | s2 | s2  ];
+    intros [ | | | | | | | A1 | s1 | s1 | s1 | s1 | s1 | s1 | s1 | s1 ]
+           [ | | | | | | | A2 | s2 | s2 | s2 | s2 | s2 | s2 | s2 | s2 ];
       simpl;try (constructor;trivial;discriminate).
    - preflect (Typ.reflect_eqb A1 A2).
      constructor;subst;trivial.
@@ -1030,9 +1031,12 @@ Module Atom.
    - preflect (Nat.eqb_spec s1 s2).
      constructor;subst;trivial.
    - intros.
+     preflect (Nat.eqb_spec s1 s2).    
+     constructor;subst;trivial.
+   - intros.
      preflect (Nat.eqb_spec s1 s2).
      preflect (Nat.eqb_spec n n0).
-     constructor;subst;trivial.
+     constructor;subst;trivial. 
    - preflect (Nat.eqb_spec s1 s2).
      constructor;subst;trivial.
    - preflect (Nat.eqb_spec s1 s2).
@@ -1072,7 +1076,7 @@ Qed.
     preflect (Typ.reflect_eqb E1 E2).
     constructor;subst;trivial.
   Qed.
-  
+
   Lemma reflect_nop_eqb : forall o1 o2, reflect (o1 = o2) (nop_eqb o1 o2).
   Proof.
     intros [t1] [t2]; simpl; preflect (Typ.reflect_eqb t1 t2); constructor; subst; reflexivity.
@@ -1197,10 +1201,9 @@ Qed.
         | BO_BVconcat s1 s2   =>  ((Typ.TWord s1 ,Typ.TWord s2 ), Typ.TWord (s1 + s2))
         | BO_BVult s   => ((Typ.TWord s,Typ.TWord s), Typ.Tbool)
         | BO_BVslt s   => ((Typ.TWord s,Typ.TWord s), Typ.Tbool)
+        | BO_BVmult s   => ((Typ.TWord s,Typ.TWord s), Typ.TWord s)
 (*
         | BO_BVsubst s   => ((Typ.TBV s,Typ.TBV s), Typ.TBV s)
-        | BO_BVmult s   => ((Typ.TBV s,Typ.TBV s), Typ.TBV s)
-
         | BO_select ti te => ((Typ.TFArray ti te, ti), te)
         | BO_diffarray ti te => ((Typ.TFArray ti te, Typ.TFArray ti te), ti)
 *)
@@ -1625,7 +1628,9 @@ Qed.
          | BO_BVult s =>
            apply_binop (Typ.TWord s) (Typ.TWord s) Typ.Tbool (@wltb s)
          | BO_BVslt s =>
-           apply_binop (Typ.TWord s) (Typ.TWord s) Typ.Tbool (@wsltb s) 
+           apply_binop (Typ.TWord s) (Typ.TWord s) Typ.Tbool (@wsltb s)
+         | BO_BVmult s =>
+           apply_binop (Typ.TWord s) (Typ.TWord s) (Typ.TWord s) (@wmult s)
 (*
 
          | BO_BVsubst s =>
@@ -2195,6 +2200,15 @@ Qed.
           apply Typ.cast_diff in H. rewrite H.
           case (Typ.cast (get_type h1) (Typ.TWord n)); auto.
         (*BVadd*)
+        specialize (H (Typ.TWord n)). simpl in H.
+        apply andb_false_iff in H. destruct H.
+        specialize (@Typ.cast_diff (get_type h1) (Typ.TWord n)). intros. 
+        rewrite andb_false_iff in H. destruct H as [ H | H ].
+          rewrite Nat.eqb_refl in H. now contradict H.
+          apply Typ.cast_diff in H. now rewrite H.
+          apply Typ.cast_diff in H. rewrite H.
+          case (Typ.cast (get_type h1) (Typ.TWord n)); auto.
+        (*BVmult*)
         specialize (H (Typ.TWord n)). simpl in H.
         apply andb_false_iff in H. destruct H.
         specialize (@Typ.cast_diff (get_type h1) (Typ.TWord n)). intros. 
