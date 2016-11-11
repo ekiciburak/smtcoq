@@ -397,12 +397,7 @@ let call_cvc4 env rt ro ra rf root =
         | No_proof -> Structures.error "CVC4 did not generate a proof"
         | Failure s -> Structures.error ("Importing of proof failed: " ^ s)
       end
-    | Sat ->
-      let smodel = get_model cvc4 in
-      Structures.error
-        ("CVC4 returned sat. Here is the model:\n\n" ^
-         SmtCommands.model_string env rt ro ra rf smodel)
-        (* (asprintf "CVC4 returned sat. Here is the model:\n%a" SExpr.print smodel) *)
+    | Sat -> Structures.error ("CVC4 returned sat.")
   in
 
   quit cvc4;
