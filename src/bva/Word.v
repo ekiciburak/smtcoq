@@ -114,6 +114,7 @@ Fixpoint Npow2 (n : nat) : N :=
     | S n' => 2 * Npow2 n'
   end%N.
 
+
 (** *)
 Fixpoint wordToList n (w : word n) : list bool :=
   match w with
@@ -458,6 +459,8 @@ Fixpoint split1 (sz1 sz2 : nat) : word (sz1 + sz2) -> word sz1 :=
     | S sz1' => fun w => WS (whd w) (split1 sz1' sz2 (wtl w))
   end.
 
+Compute @split1 2 3 (WS true (WS false (WS false (WS false (WS false WO))))).
+
 Fixpoint split2 (sz1 sz2 : nat) : word (sz1 + sz2) -> word sz2 :=
   match sz1 with
     | O => fun w => w
@@ -581,6 +584,9 @@ Definition zext (sz : nat) (w : word sz) (sz' : nat) : word (sz + sz') :=
 Definition wneg sz (x : word sz) : word sz :=
   NToWord sz (Npow2 sz - wordToN x).
 
+
+Compute @wneg 4 (WS false (WS false (WS true (WS true (WO))))).
+
 Definition wordBin (f : N -> N -> N) sz (x y : word sz) : word sz :=
   NToWord sz (f (wordToN x) (wordToN y)).
 
@@ -608,18 +614,6 @@ Proof. intro n.
        - now compute.
        - rewrite IHn. unfold wzero. now simpl.
 Qed.
-
-Theorem ltWz: forall n a1 a2, wordBin N.add (WS a1 (wzero n)) (WS a2 (wzero n)) =
- WS (xorb a1 a2) (wzero n).
-Admitted.
-
-
-Theorem cons_wplus: forall (l1 l2: list bool) a1 a2 n,
-a1 <> true -> a2 <> true ->
-wordBin N.add (WS a1 (ListToword l1 n)) (WS a2 (ListToword l2 n)) =
- WS (xorb a1 a2)
- (wordBin N.add (ListToword l1 n) (ListToword l2 n)).
-Proof. Admitted.
 
 
 Definition wmult' sz (x y : word sz) : word sz := 

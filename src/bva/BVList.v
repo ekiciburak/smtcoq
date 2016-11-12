@@ -483,6 +483,8 @@ Definition bv_add (a b : bitvector) : bitvector :=
 
 Definition twos_complement b :=
   add_list_ingr (map negb b) (mk_list_false (length b)) true.
+
+Compute twos_complement [false; false; true; true].
   
 Definition bv_neg (a: bitvector) : bitvector := (twos_complement a).
 
