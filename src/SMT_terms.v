@@ -812,10 +812,11 @@ Module Atom.
    | UO_Zopp
    | UO_BVzextn (n: nat) (i: nat)
    | UO_BVsextn (n: nat) (i: nat)
-   | UO_BVneg   (_: nat).
+   | UO_BVneg   (_: nat)
+   | UO_BVnot   (_: nat).
 (*
    | UO_BVbitOf (_: N) (_: nat)
-   | UO_BVnot   (_: N)
+
    | UO_BVextr  (i: N) (n0: N) (n1: N)
 *)
 
@@ -883,9 +884,10 @@ Module Atom.
    | UO_BVzextn s1 i1, UO_BVzextn s2 i2 => Nat.eqb s1 s2 && Nat.eqb i1 i2
    | UO_BVsextn s1 i1, UO_BVsextn s2 i2 => Nat.eqb s1 s2 && Nat.eqb i1 i2
    | UO_BVneg s1, UO_BVneg s2 => Nat.eqb s1 s2
+   | UO_BVnot s1, UO_BVnot s2 => Nat.eqb s1 s2
 (*
    | UO_BVbitOf s1 n, UO_BVbitOf s2 m => Nat_eqb n m && N.eqb s1 s2
-   | UO_BVnot s1, UO_BVnot s2 => N.eqb s1 s2
+
 
    | UO_BVextr i0 n00 n01, UO_BVextr i1 n10 n11 => N.eqb i0 i1 && N.eqb n00 n10 && N.eqb n01 n11
 
@@ -961,10 +963,12 @@ Module Atom.
 
   Lemma reflect_uop_eqb : forall o1 o2, reflect (o1 = o2) (uop_eqb o1 o2).
   Proof.
-    intros [ | | | | | | | ] [ | | | | | | | ]; simpl; try constructor;trivial; try discriminate.
+    intros [ | | | | | | | | ] [ | | | | | | | | ]; simpl; try constructor;trivial; try discriminate.
     intros. preflect (Nat.eqb_spec n n0). preflect (Nat.eqb_spec i i0).  rewrite Heq, Heq0.
     now constructor.
     intros. preflect (Nat.eqb_spec n n0). preflect (Nat.eqb_spec i i0).  rewrite Heq, Heq0.
+    now constructor.
+    intros. preflect (Nat.eqb_spec n n0). rewrite Heq.
     now constructor.
     intros. preflect (Nat.eqb_spec n n0). rewrite Heq.
     now constructor.
@@ -1178,9 +1182,10 @@ Qed.
         | UO_BVzextn s i => (Typ.TWord s, Typ.TWord (i + s))
         | UO_BVsextn s i => (Typ.TWord s, Typ.TWord (i + s))
         | UO_BVneg s => (Typ.TWord s, Typ.TWord s)
+        | UO_BVnot s => (Typ.TWord s, Typ.TWord s)
 (*
         | UO_BVbitOf s _ => (Typ.TBV s, Typ.Tbool)
-        | UO_BVnot s => (Typ.TBV s, Typ.TBV s)
+
 
         | UO_BVextr i n0 n1 => (Typ.TBV n1, Typ.TBV n0)
 
@@ -1598,9 +1603,10 @@ Qed.
         | UO_BVsextn s i => 
           apply_unop (Typ.TWord s) (Typ.TWord (s + i)) (fun w => @sext s w i)
         | UO_BVneg s => apply_unop (Typ.TWord s) (Typ.TWord s) (@wneg s)
+        | UO_BVnot s => apply_unop (Typ.TWord s) (Typ.TWord s) (@wnot s)
 (*
         | UO_BVbitOf s n => apply_unop (Typ.TBV s) Typ.Tbool (BITVECTOR_LIST.bitOf n)
-        | UO_BVnot s => apply_unop (Typ.TBV s) (Typ.TBV s) (@BITVECTOR_LIST.bv_not s)
+
 
         | UO_BVextr i n0 n1 => 
           apply_unop (Typ.TBV n1) (Typ.TBV n0) (@BITVECTOR_LIST.bv_extr i n0 n1)
@@ -2150,13 +2156,14 @@ Qed.
             destruct H as [ H | H].
               rewrite Nat.eqb_refl in H. now contradict H.
               now rewrite H.
+            (* bv_not *)
+            specialize (H (Typ.TWord n)). simpl in H. rewrite andb_false_iff in H.
+            destruct H as [ H | H].
+              rewrite Nat.eqb_refl in H. now contradict H.
+              now rewrite H.
 
 (*
-            (* bv_not *)
-            specialize (H (Typ.TBV n)). simpl in H. rewrite andb_false_iff in H.
-            destruct H as [ H | H].
-              rewrite N.eqb_refl in H. now contradict H.
-              now rewrite H.
+
 
             (* bv_extr *)
             specialize (H (Typ.TBV n0)). simpl in H. rewrite andb_false_iff in H.

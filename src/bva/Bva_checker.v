@@ -656,6 +656,43 @@ Fixpoint check_symopp (bs1 bs2 bsres : list _lit) (bvop: binop)  :=
 
 
 
+  (** * Bit-blasting bitvector not ...
+
+           bbT(a, [a0; ...; an])
+        ------------------------------ bbNot
+         bbT(not a, [~a0; ...; ~an])
+   *)
+
+  (* Helper function for bv_not *)
+  Fixpoint check_not (bs br : list _lit)  :=
+    match bs, br with
+    | nil, nil => true
+    | b::bs, r::br => (r == Lit.neg b) && check_not bs br
+    | _, _ => false
+    end.
+
+  (** Checker for bitblasting of bitvector not *)
+  Definition check_bbNot s pos lres :=
+    match S.get s pos with
+    | l::nil =>
+      if (Lit.is_pos l) && (Lit.is_pos lres) then
+        match get_form (Lit.blit l), get_form (Lit.blit lres) with
+        | FbbT a bs, FbbT r br =>
+          match get_atom r with
+          | Auop (UO_BVnot N) a' =>
+            if (a == a') && check_not bs br &&
+              ( (length bs) =? N)%nat
+            then lres::nil
+            else C._true
+          | _ => C._true
+          end
+        | _, _ => C._true
+        end
+      else C._true
+    | _ => C._true
+    end.
+
+
 (*
 
   (** * Bit-blasting a variable:
@@ -702,41 +739,6 @@ Fixpoint check_symopp (bs1 bs2 bsres : list _lit) (bvop: binop)  :=
 
   Variable s : S.t.
 
-  (** * Bit-blasting bitvector not ...
-
-           bbT(a, [a0; ...; an])
-        ------------------------------ bbNot
-         bbT(not a, [~a0; ...; ~an])
-   *)
-
-  (* Helper function for bv_not *)
-  Fixpoint check_not (bs br : list _lit)  :=
-    match bs, br with
-    | nil, nil => true
-    | b::bs, r::br => (r == Lit.neg b) && check_not bs br
-    | _, _ => false
-    end.
-
-  (** Checker for bitblasting of bitvector not *)
-  Definition check_bbNot pos lres :=
-    match S.get s pos with
-    | l::nil =>
-      if (Lit.is_pos l) && (Lit.is_pos lres) then
-        match get_form (Lit.blit l), get_form (Lit.blit lres) with
-        | FbbT a bs, FbbT r br =>
-          match get_atom r with
-          | Auop (UO_BVnot N) a' =>
-            if (a == a') && check_not bs br &&
-              (N.of_nat (length bs) =? N)%N
-            then lres::nil
-            else C._true
-          | _ => C._true
-          end
-        | _, _ => C._true
-        end
-      else C._true
-    | _ => C._true
-    end.
 
   (** * Bit-blasting bitwise operations: bbAnd, bbOr, ...
 
@@ -2941,7 +2943,7 @@ Proof.
       case_eq (t_form .[ Lit.blit lres]); try (intros; now apply C.interp_true).
       intros a bsres Heq5.
       case_eq (t_atom .[ a]); try (intros; now apply C.interp_true).
-      intros [ | | | | | | | ]  a1'  Heq6; try (intros; now apply C.interp_true).
+      intros [ | | | | | | | | ]  a1'  Heq6; try (intros; now apply C.interp_true).
       (* BVzextend *)
     - case_eq ((a1 == a1')); simpl; intros Heq7; try (now apply C.interp_true).
         case_eq (
@@ -6603,7 +6605,7 @@ Proof.
       case_eq (t_form .[ Lit.blit lres]); try (intros; now apply C.interp_true).
       intros a bsres Heq8.
       case_eq (t_atom .[ a]); try (intros; now apply C.interp_true).
-      intros [ | | | | | | | ] a1' Heq9; try now apply C.interp_true.
+      intros [ | | | | | | | | ] a1' Heq9; try now apply C.interp_true.
 
       case_eq ((a1 == a1') && check_neg bs1 bsres &&
       ((Datatypes.length bs1) =? n)%nat); 
@@ -6739,6 +6741,187 @@ Proof.
 Qed.
 
 
+Lemma not_eq: forall a,
+wnot (ListToword a (length a)) = ListToword (map negb a) (length a).
+Proof. intro a.
+       induction a as [ | xa xsa IHa ]; intros.
+       - now simpl.
+       - simpl. rewrite helper_strong.
+         simpl. specialize (helper_strong (map negb xsa) (negb xa)); intros.
+         rewrite map_length in H. now rewrite H, IHa.
+Qed.
+
+Lemma prop_check_not:
+  forall bs br, length bs = length br ->
+           check_not bs br = true ->
+           map (Lit.interp rho) br = map (fun l => negb (Lit.interp rho l)) bs.
+Proof.
+  intro bs; induction bs; intros br Hlen Hcheck.
+  - simpl in Hlen. symmetry in Hlen. apply empty_list_length in Hlen. rewrite Hlen; now simpl.
+  - case br in *.
+    + simpl in Hcheck; now contradict Hcheck.
+    + simpl in Hlen. inversion Hlen as [Hlen'].
+      simpl in Hcheck. rewrite andb_true_iff in Hcheck; destruct Hcheck as (Hcheck1, Hcheck2).
+      apply Int63Properties.eqb_spec in Hcheck1; rewrite Hcheck1.
+      simpl. rewrite Lit.interp_neg. apply f_equal.
+      apply IHbs; auto.
+Qed.
+
+Lemma check_not_length:
+  forall bs br, check_not bs br = true -> length bs = length br.
+Proof.
+  intro bs; induction bs; intros br Hcheck.
+  - case br in *.
+    + auto.
+    + simpl in Hcheck; now contradict Hcheck.
+  - case br in *.
+    + simpl in Hcheck; now contradict Hcheck.
+    + simpl in *.
+      rewrite andb_true_iff in Hcheck.
+      destruct Hcheck as (_, Hcheck').
+      apply IHbs in Hcheck'; auto.
+Qed.
+
+Lemma prop_check_notw: forall a,
+ListToword (map (fun l : int => negb (Lit.interp rho l)) a) (length a) =
+wnot (ListToword (map (Lit.interp rho) a) (length a)).
+Proof. intro a.
+       induction a as [ | xa xsa IHa ]; intros.
+       - now simpl.
+       - simpl. specialize (helper_strong (map (fun l : int => negb (Lit.interp rho l)) xsa) 
+                                          (negb (Lit.interp rho xa))); intros.
+         rewrite map_length in H. rewrite H.
+         specialize (helper_strong ( map (Lit.interp rho) xsa) (Lit.interp rho xa)); intros.
+         rewrite map_length in H0. rewrite H0.
+         simpl. now rewrite IHa.
+Qed.
+
+Lemma valid_check_bbNot s pos lres : C.valid rho (check_bbNot s pos lres).
+Proof.
+  unfold check_bbNot.
+  case_eq (S.get s pos); [ (intros; now apply C.interp_true) | ].
+  intros l ls Hpos.
+  case_eq ls; [ | (intros; now apply C.interp_true) ].
+  intro Hnil.
+  case_eq (Lit.is_pos l && Lit.is_pos lres); [ | (intros; now apply C.interp_true) ].
+  intro Hpos'.
+  case_eq (t_form .[ Lit.blit l]); try (intros; now apply C.interp_true).
+  intros a bs HBl.
+  case_eq (t_form .[ Lit.blit lres]); try (intros; now apply C.interp_true).
+  intros r br HBr.
+  case_eq (t_atom .[ r]); try (intros; now apply C.interp_true).
+  intros u a'.
+  case_eq u; try (intros; now apply C.interp_true).
+  intros n Huot Hr.
+  case_eq ((a == a')
+             && check_not bs br
+             && ((Datatypes.length bs) =? n)%nat);
+    try (intros; now apply C.interp_true).
+  intro Hc.
+  rewrite !andb_true_iff in Hc.
+  destruct Hc as ((Ha, Hcheck), Hlen).
+  rewrite Nat.eqb_eq in Hlen.
+  apply Int63Properties.eqb_spec in Ha.
+  generalize (Hs s pos).
+  rewrite Hpos, Hnil.
+  unfold C.valid, C.interp; simpl; rewrite !orb_false_r.
+  unfold Lit.interp, Var.interp.
+  rewrite andb_true_iff in Hpos'.
+  destruct Hpos' as (Hposl, Hposlres).
+  rewrite Hposl, Hposlres.
+  rewrite !rho_interp. rewrite HBl, HBr. simpl.
+
+  intro Heqa.
+  apply Word.weqb_true_iff in Heqa.
+  apply Word.weqb_true_iff.
+
+
+  generalize wt_t_atom. unfold Atom.wt. unfold is_true.
+  rewrite PArray.forallbi_spec;intros.
+
+  pose proof (H r). 
+  assert (r < PArray.length t_atom).
+  {
+    apply PArray.get_not_default_lt. rewrite def_t_atom. rewrite Hr. easy.
+  }
+
+  specialize (@H0 H1). rewrite Hr in H0. simpl in H0.
+  rewrite !andb_true_iff in H0. destruct H0.
+
+  unfold get_type' in H0. unfold v_type in H0.
+  case_eq (t_interp .[ r]).
+  intros v_typer v_valr Htir. rewrite Htir in H0.
+  case_eq (v_typer); intros; rewrite H3 in H0; try (now contradict H1).
+  rename H3 into Hv.
+
+  (* interp_form_hatom_bv r = 
+          interp_bv t_i (interp_atom (t_atom .[r])) *)
+  assert (interp_form_hatom_word r = 
+          interp_word t_i (interp_atom (t_atom .[r]))).
+  {
+    unfold Atom.interp_form_hatom_word.
+    unfold Atom.interp_hatom.
+    rewrite !Atom.t_interp_wf; trivial.
+  }
+
+  rewrite H3, Hr. simpl.
+  unfold interp_word.
+  apply Typ.eqb_spec in H2.
+  unfold get_type' in H2.
+  unfold v_type in H2.
+  case_eq (t_interp .[ a']).
+  intros. rewrite H4 in H2. simpl.
+
+  revert v_val0 H4.  
+  rewrite H2. intros.
+  rewrite Typ.cast_refl.
+  simpl.
+
+  assert ( ( (Datatypes.length (map (Lit.interp rho) br))) = n).
+  {
+    apply check_not_length in Hcheck. rewrite Hcheck in Hlen.
+    now rewrite map_length.
+  }
+
+  rewrite H5.
+  intros.
+  rewrite Typ.nat_cast_refl.
+
+  rewrite <- Ha in *.
+
+   (* interp_form_hatom_bv a = 
+          interp_bv t_i (interp_atom (t_atom .[a])) *)
+  assert (interp_form_hatom_word a = 
+          interp_word t_i (interp_atom (t_atom .[a]))).
+  {
+    unfold Atom.interp_form_hatom_word.
+    unfold Atom.interp_hatom.
+    rewrite !Atom.t_interp_wf; trivial.
+  }
+
+  rewrite H6 in Heqa.
+  unfold interp_atom in Heqa.
+  rewrite Atom.t_interp_wf in H4; trivial. unfold interp_atom in H4.
+  rewrite H4 in Heqa.
+  revert Heqa . 
+
+  assert ( ((Datatypes.length (map (Lit.interp rho) bs))) = n).
+  {
+    now rewrite map_length.
+  }
+
+  rewrite H7. unfold interp_word.
+  rewrite Typ.cast_refl. intros.
+  rewrite Heqa. simpl.
+
+  specialize (@prop_check_not bs br). intros.
+  symmetry.
+  unfold RAWBITVECTOR_LIST.bits.
+  rewrite H8; auto. now rewrite <- H7, map_length, prop_check_notw.
+
+  now apply check_not_length in Hcheck.
+
+Qed.
 
 
 
@@ -9923,179 +10106,7 @@ Proof.
  now apply prop_check_bbc2.
 Qed.
 
-Lemma prop_check_not:
-  forall bs br, length bs = length br ->
-           check_not bs br = true ->
-           map (Lit.interp rho) br = map (fun l => negb (Lit.interp rho l)) bs.
-Proof.
-  intro bs; induction bs; intros br Hlen Hcheck.
-  - simpl in Hlen. symmetry in Hlen. apply empty_list_length in Hlen. rewrite Hlen; now simpl.
-  - case br in *.
-    + simpl in Hcheck; now contradict Hcheck.
-    + simpl in Hlen. inversion Hlen as [Hlen'].
-      simpl in Hcheck. rewrite andb_true_iff in Hcheck; destruct Hcheck as (Hcheck1, Hcheck2).
-      apply Int63Properties.eqb_spec in Hcheck1; rewrite Hcheck1.
-      simpl. rewrite Lit.interp_neg. apply f_equal.
-      apply IHbs; auto.
-Qed.
 
-Lemma check_not_length:
-  forall bs br, check_not bs br = true -> length bs = length br.
-Proof.
-  intro bs; induction bs; intros br Hcheck.
-  - case br in *.
-    + auto.
-    + simpl in Hcheck; now contradict Hcheck.
-  - case br in *.
-    + simpl in Hcheck; now contradict Hcheck.
-    + simpl in *.
-      rewrite andb_true_iff in Hcheck.
-      destruct Hcheck as (_, Hcheck').
-      apply IHbs in Hcheck'; auto.
-Qed.
-
-Lemma valid_check_bbNot pos lres : C.valid rho (check_bbNot pos lres).
-Proof.
-  unfold check_bbNot.
-  case_eq (S.get s pos); [ (intros; now apply C.interp_true) | ].
-  intros l ls Hpos.
-  case_eq ls; [ | (intros; now apply C.interp_true) ].
-  intro Hnil.
-  case_eq (Lit.is_pos l && Lit.is_pos lres); [ | (intros; now apply C.interp_true) ].
-  intro Hpos'.
-  case_eq (t_form .[ Lit.blit l]); try (intros; now apply C.interp_true).
-  intros a bs HBl.
-  case_eq (t_form .[ Lit.blit lres]); try (intros; now apply C.interp_true).
-  intros r br HBr.
-  case_eq (t_atom .[ r]); try (intros; now apply C.interp_true).
-  intros u a'.
-  case_eq u; try (intros; now apply C.interp_true).
-  intros n Huot Hr.
-  case_eq ((a == a')
-             && check_not bs br
-             && (N.of_nat (Datatypes.length bs) =? n)%N);
-    try (intros; now apply C.interp_true).
-  intro Hc.
-  rewrite !andb_true_iff in Hc.
-  destruct Hc as ((Ha, Hcheck), Hlen).
-  rewrite N.eqb_eq in Hlen.
-  apply Int63Properties.eqb_spec in Ha.
-  generalize (Hs pos).
-  rewrite Hpos, Hnil.
-  unfold C.valid, C.interp; simpl; rewrite !orb_false_r.
-  unfold Lit.interp, Var.interp.
-  rewrite andb_true_iff in Hpos'.
-  destruct Hpos' as (Hposl, Hposlres).
-  rewrite Hposl, Hposlres.
-  rewrite !rho_interp. rewrite HBl, HBr. simpl.
-
-  intro Heqa.
-  apply BITVECTOR_LIST.bv_eq_reflect in Heqa.
-  apply BITVECTOR_LIST.bv_eq_reflect.
-
-
-  generalize wt_t_atom. unfold Atom.wt. unfold is_true.
-  rewrite PArray.forallbi_spec;intros.
-
-  pose proof (H r). 
-  assert (r < PArray.length t_atom).
-  {
-    apply PArray.get_not_default_lt. rewrite def_t_atom. rewrite Hr. easy.
-  }
-
-  specialize (@H0 H1). rewrite Hr in H0. simpl in H0.
-  rewrite !andb_true_iff in H0. destruct H0.
-
-  unfold get_type' in H0. unfold v_type in H0.
-  case_eq (t_interp .[ r]).
-  intros v_typer v_valr Htir. rewrite Htir in H0.
-  case_eq (v_typer); intros; rewrite H3 in H0; try (now contradict H1).
-  rename H3 into Hv.
-
-  (* interp_form_hatom_bv r = 
-          interp_bv t_i (interp_atom (t_atom .[r])) *)
-  assert (interp_form_hatom_bv r = 
-          interp_bv t_i (interp_atom (t_atom .[r]))).
-  {
-    unfold Atom.interp_form_hatom_bv.
-    unfold Atom.interp_hatom.
-    rewrite !Atom.t_interp_wf; trivial.
-  }
-
-  rewrite H3, Hr. simpl.
-  unfold interp_bv.
-  apply Typ.eqb_spec in H2.
-  unfold get_type' in H2.
-  unfold v_type in H2.
-  case_eq (t_interp .[ a']).
-  intros. rewrite H4 in H2. simpl.
-
-  revert v_val0 H4.  
-  rewrite H2. intros.
-  rewrite Typ.cast_refl.
-  simpl.
-
-  assert ( (N.of_nat (Datatypes.length (map (Lit.interp rho) br))) = n).
-  {
-    apply check_not_length in Hcheck. rewrite Hcheck in Hlen.
-    now rewrite map_length.
-  }
-
-  unfold BITVECTOR_LIST.of_bits, RAWBITVECTOR_LIST.of_bits.
-
-  generalize (
-        BITVECTOR_LIST.of_bits_size (map (Lit.interp rho) br)
-        ).
-
-  rewrite H5.
-  intros.
-  rewrite Typ.N_cast_refl.
-  unfold BITVECTOR_LIST.bv_not, RAWBITVECTOR_LIST.bv_not.
-
-  apply eq_rec.
-  simpl.
-
-  rewrite <- Ha in *.
-
-   (* interp_form_hatom_bv a = 
-          interp_bv t_i (interp_atom (t_atom .[a])) *)
-  assert (interp_form_hatom_bv a = 
-          interp_bv t_i (interp_atom (t_atom .[a]))).
-  {
-    unfold Atom.interp_form_hatom_bv.
-    unfold Atom.interp_hatom.
-    rewrite !Atom.t_interp_wf; trivial.
-  }
-
-  rewrite H6 in Heqa.
-  unfold interp_bv in Heqa.
-  rewrite <- !Atom.t_interp_wf in Heqa; trivial.
-  rewrite H4 in Heqa.
-  revert Heqa . 
-
-  assert ( (N.of_nat (Datatypes.length (map (Lit.interp rho) bs))) = n).
-  {
-    now rewrite map_length.
-  }
-
-  unfold BITVECTOR_LIST.of_bits, RAWBITVECTOR_LIST.of_bits.
-
-  generalize (
-         BITVECTOR_LIST.of_bits_size (map (Lit.interp rho) bs)
-        ).
-
-  rewrite H7.
-  rewrite Typ.cast_refl. intros.
-  rewrite Heqa. simpl.
-
-  specialize (@prop_check_not bs br). intros.
-  symmetry.
-  unfold RAWBITVECTOR_LIST.bits.
-  rewrite map_map; apply H8; auto.
-
-  now apply check_not_length in Hcheck.
-
-Qed.
 
 
 
