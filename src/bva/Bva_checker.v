@@ -692,6 +692,39 @@ Fixpoint check_symopp (bs1 bs2 bsres : list _lit) (bvop: binop)  :=
     | _ => C._true
     end.
 
+(* bitwise disequality *)
+
+  Fixpoint List_diseqb (a b: list bool) : bool :=
+  match a, b with
+    | nil, nil =>  false
+    | xa :: xsa, xb :: xsb =>
+      if (Bool.eqb xa false) then 
+        (if (Bool.eqb xb false) then List_diseqb xsa xsb else  true)
+      else (if (Bool.eqb xb true) then List_diseqb xsa xsb else  true)
+    | _, _ => true
+  end.
+
+
+  (** Checker for bitvector disequality *)
+  Definition check_bbDiseq lres :=
+  if negb (Lit.is_pos lres) then
+      match get_form (Lit.blit lres) with
+          | Fatom f => 
+          match (get_atom f) with
+            |  Abop (BO_eq (Typ.TWord n)) a b =>
+             match (get_atom a), (get_atom b) with
+               | (Acop (CO_Word bv1)), (Acop (CO_Word bv2)) =>
+                  if List_diseqb bv1 bv2 && ( (length bv1) =? n)%nat
+                     && ((length bv2) =? n)%nat
+                  then lres::nil
+                  else C._true
+               | _, _ => C._true
+             end
+           | _ => C._true
+         end
+          | _ => C._true
+      end
+    else C._true.
 
 (*
 
@@ -740,96 +773,6 @@ Fixpoint check_symopp (bs1 bs2 bsres : list _lit) (bvop: binop)  :=
   Variable s : S.t.
 
 
-  (** * Bit-blasting bitwise operations: bbAnd, bbOr, ...
-
-        bbT(a, [a0; ...; an])      bbT(b, [b0; ...; bn])
-       -------------------------------------------------- bbAnd
-             bbT(a&b, [a0 /\ b0; ...; an /\ bn])
-   *)
-
-Fixpoint check_symopp (bs1 bs2 bsres : list _lit) (bvop: binop)  :=
-    match bs1, bs2, bsres with
-    | nil, nil, nil => true
-    | b1::bs1, b2::bs2, bres::bsres =>
-      if Lit.is_pos bres then
-        let (ires, bvop) := 
-        match get_form (Lit.blit bres), bvop with
-
-          | Fand args, BO_BVand n  =>
-            ((if PArray.length args == 2 then
-                let a1 := args.[0] in
-                let a2 := args.[1] in
-                ((a1 == b1) && (a2 == b2)) || ((a1 == b2) && (a2 == b1))
-              else false), BO_BVand (n-1))
-
-          | For args, BO_BVor n  =>
-            ((if PArray.length args == 2 then
-                let a1 := args.[0] in
-                let a2 := args.[1] in
-                ((a1 == b1) && (a2 == b2)) || ((a1 == b2) && (a2 == b1))
-              else false), BO_BVor (n-1))
-
-          | Fxor a1 a2, BO_BVxor n =>
-             (((a1 == b1) && (a2 == b2)) || ((a1 == b2) && (a2 == b1)),
-             BO_BVxor (n-1))
-
-          | Fiff a1 a2, (BO_eq (Typ.TBV n))  =>
-             (((a1 == b1) && (a2 == b2)) || ((a1 == b2) && (a2 == b1)),
-             BO_eq (Typ.TBV n))
-
-          | _, _ => (false, bvop)
-        end in
-        if ires then check_symopp bs1 bs2 bsres bvop
-        else false
-      else false
-    | _, _, _ => false
-    end.
-
-  Lemma empty_list_length: forall {A: Type} (a: list A), (length a = 0)%nat <-> a = [].
-  Proof. intros A a.
-         induction a; split; intros; auto; contradict H; easy.
-  Qed.
-
-  (** Checker for bitblasting of bitwise operators on bitvectors *)
-  Definition check_bbOp pos1 pos2 lres :=
-    match S.get s pos1, S.get s pos2 with
-    | l1::nil, l2::nil =>
-      if (Lit.is_pos l1) && (Lit.is_pos l2) && (Lit.is_pos lres) then
-        match get_form (Lit.blit l1), get_form (Lit.blit l2), get_form (Lit.blit lres) with
-        | FbbT a1 bs1, FbbT a2 bs2, FbbT a bsres =>
-          match get_atom a with
-
-          | Abop (BO_BVand n) a1' a2' =>
-            if (((a1 == a1') && (a2 == a2')) || ((a1 == a2') && (a2 == a1')))
-                 && (@check_symopp bs1 bs2 bsres (BO_BVand n))
-                 && (Nat.eqb (length bs1) n)
-            then lres::nil
-            else C._true
-
-          | Abop (BO_BVor n) a1' a2' =>
-             if (((a1 == a1') && (a2 == a2')) || ((a1 == a2') && (a2 == a1')))
-                  && (check_symopp bs1 bs2 bsres  (BO_BVor n))
-                  && (N.of_nat (length bs1) =? n)%N
-             then lres::nil
-             else C._true
-
-          | Abop (BO_BVxor n) a1' a2' =>
-             if (((a1 == a1') && (a2 == a2')) || ((a1 == a2') && (a2 == a1')))
-                  && (check_symopp bs1 bs2 bsres  (BO_BVxor n))
-                  && (N.of_nat (length bs1) =? n)%N
-             then lres::nil
-             else C._true
-
-       | _ => C._true
-          end
-        | _, _, _ => C._true
-        end
-      else C._true
-    | _, _ => C._true
-    end.
-
-
-
   Definition slt_big_endian_lit_list (x y: list _lit) :=
     match x, y with
       | nil, _ => Clit (Lit._false)
@@ -876,40 +819,8 @@ Fixpoint check_symopp (bs1 bs2 bsres : list _lit) (bvop: binop)  :=
     | _, _ => C._true
     end.
 
-(* bitwise disequality *)
-
-  Fixpoint List_diseqb (a b: list bool) : bool :=
-  match a, b with
-    | nil, nil =>  false
-    | xa :: xsa, xb :: xsb =>
-      if (Bool.eqb xa false) then 
-        (if (Bool.eqb xb false) then List_diseqb xsa xsb else  true)
-      else (if (Bool.eqb xb true) then List_diseqb xsa xsb else  true)
-    | _, _ => true
-  end.
 
 
-  (** Checker for bitvector disequality *)
-  Definition check_bbDiseq lres :=
-  if negb (Lit.is_pos lres) then
-      match get_form (Lit.blit lres) with
-          | Fatom f => 
-          match (get_atom f) with
-            |  Abop (BO_eq (Typ.TBV n)) a b =>
-             match (get_atom a), (get_atom b) with
-               | (Acop (CO_BV bv1 n1)), (Acop (CO_BV bv2 n2)) =>
-                  if List_diseqb bv1 bv2 && (N.of_nat (length bv1) =? n)%N
-                     && (N.of_nat (length bv2) =? n)%N
-                     && (n1 =? n)%N && (n2 =? n)%N
-                  then lres::nil
-                  else C._true
-               | _, _ => C._true
-             end
-           | _ => C._true
-         end
-          | _ => C._true
-      end
-    else C._true.
 
 
   (** Checker for bitvector extraction *)
@@ -964,7 +875,7 @@ Fixpoint check_symopp (bs1 bs2 bsres : list _lit) (bvop: binop)  :=
         end
    end.
 
-  Definition check_bbExtract pos lres :=
+  Definition check_bbExtract s pos lres :=
     match S.get s pos with
       | l1::nil =>
         if (Lit.is_pos l1) && (Lit.is_pos lres) then
@@ -6923,7 +6834,185 @@ Proof.
 
 Qed.
 
+Lemma diseq_neg_eq: forall (la lb: list bool),
+      List_diseqb la lb = true -> negb (RAWBITVECTOR_LIST.beq_list la lb) = true.
+Proof. intro la.
+       induction la.
+       - intros. simpl in H. case lb in *.
+           now contradict H.
+           now simpl.
+       - intros.
+         simpl in *.
+         case lb in *.
+          easy.
+          case_eq (Bool.eqb a false).
+          intros. rewrite H0 in H.
+          case_eq (Bool.eqb b false).
+          intros. rewrite H1 in H.
+          case a in *. now contradict H0.
+          case b in *. now contradict H1.
+          simpl.
+          apply IHla. easy.
+          case a in *. now contradict H0.
+          case b in *. intros.
+          now simpl.
+          intros. simpl.
+          apply IHla.
+          simpl in H. easy.
+          intros. rewrite H0 in H.
+          case_eq (Bool.eqb b true ). intros.
+          case a in *. 
+          case b in *. simpl.
+          apply IHla. simpl in H. easy.
+          now simpl.
+          now contradict H0.
+          intros.
+          case a in *.
+          case b in *. simpl in *. now contradict H1.
+          now simpl in *.
+          case b in *. now simpl in *.
+          simpl in *. now contradict H.
+Qed.
 
+
+Lemma diseq_neg_eqw: forall (a b: list bool),
+      length a = length b ->
+      List_diseqb a b = true -> 
+      negb (Word.weqb (ListToword a (length a)) (ListToword b (length a))) = true.
+Proof. intro a.
+       induction a as [ | xa xsa IHa ]; intros.
+       - simpl in *. symmetry in H. rewrite empty_list_length in H. now rewrite H in H0.
+       - simpl. case_eq b; intros. subst. now contradict H0.
+         rewrite helper_strong. specialize (helper_strong l b0); intros.
+         rewrite H1 in H. inversion H. rewrite H4, H2. simpl.
+         case_eq (Bool.eqb xa b0); intros.
+         case_eq (weqb (ListToword xsa (Datatypes.length l)) (ListToword l (Datatypes.length l))); intros.
+         specialize (IHa l H4). rewrite <- H4 in H5.
+         rewrite H5 in IHa. apply IHa.
+         pose proof H0 as H0p.
+         rewrite H1 in H0. simpl in H0. 
+         case_eq (Bool.eqb xa false); intros. rewrite H6 in H0.
+         case_eq xa; intros. rewrite H7 in H6. simpl in H6. now contradict H6.
+         rewrite H7 in H3. case_eq b0; intros. rewrite H8 in H3. simpl in H3. now contradict H3.
+         rewrite H8 in H0. now simpl in H0.
+         case_eq xa; intros. rewrite H7 in H0. simpl in H0.
+         rewrite H7 in H3. case_eq b0; intros. rewrite H8 in H0. now simpl in H0.
+         rewrite H8 in H3. now contradict H3.
+         rewrite H7 in H6. simpl in H6. now contradict H6.
+         easy. easy.
+Qed.
+
+
+Lemma valid_check_bbDiseq lres : C.valid rho (check_bbDiseq lres).
+Proof. 
+      unfold check_bbDiseq.
+      case_eq (Lit.is_pos lres); intro Heq; simpl; try now apply C.interp_true.
+      case_eq (t_form .[ Lit.blit lres]); try (intros; now apply C.interp_true).
+        intros f Heq2.
+      case_eq (t_atom .[ f]); try (intros; now apply C.interp_true).
+
+      intros [ | | | | | | |[ A B | A| | |  | ]|N|N|N|N|N|N|N|N ];
+         try (intros; now apply C.interp_true). intros n a b Heq3.
+      case_eq (t_atom .[ a]); try (intros; now apply C.interp_true).
+      intros c Heq4.
+      case_eq c; try (intros; now apply C.interp_true).
+      intros la Heq5.
+      case_eq (t_atom .[ b]); try (intros; now apply C.interp_true).
+      intros c0 Heq6.
+      case_eq c0; try (intros; now apply C.interp_true).
+      intros lb Heq7.
+      case_eq (List_diseqb la lb && ((Datatypes.length la) =? n)%nat
+              &&  ((Datatypes.length lb) =? n))%nat;
+         try (intros; now apply C.interp_true). intros Heq8.
+
+      unfold C.valid. simpl. rewrite orb_false_r.
+      unfold Lit.interp. rewrite Heq.
+      unfold Var.interp.
+      rewrite wf_interp_form; trivial. rewrite Heq2. simpl.
+      unfold Atom.interp_form_hatom, interp_hatom.
+      rewrite Atom.t_interp_wf; trivial.
+      rewrite Heq3. simpl.
+      rewrite !Atom.t_interp_wf; trivial.
+      rewrite Heq4, Heq6. simpl.
+      rewrite Heq5, Heq7. simpl.
+
+        rewrite !andb_true_iff in Heq8.
+        destruct Heq8 as (Heq8, Ha).
+        destruct Heq8 as (Heq8, Hb).
+        rewrite Nat.eqb_eq in Ha, Hb.
+        rewrite Ha, Hb.
+        rewrite Typ.nat_cast_refl. simpl.
+
+        generalize wt_t_atom. unfold Atom.wt. unfold is_true.
+        rewrite PArray.forallbi_spec;intros.
+
+        (* a *)
+        pose proof (H a). 
+        assert (a < PArray.length t_atom).
+        { apply PArray.get_not_default_lt. rewrite def_t_atom. rewrite Heq4, Heq5. easy. }
+        specialize (@H0 H1). rewrite Heq4 in H0. simpl in H0.
+        unfold get_type' in H0. unfold v_type in H0.
+        case_eq (t_interp .[ a]).
+        intros v_typea v_vala Htia. rewrite Htia in H0.
+        rewrite Atom.t_interp_wf in Htia; trivial.
+        rewrite Heq4, Heq5 in Htia. simpl in Htia.
+        rewrite Hb in Htia.
+        unfold Bval in Htia.
+        rewrite Heq5 in H0. simpl in H0.
+        inversion Htia.
+
+        generalize dependent v_vala.
+        rewrite <- H3. intros.
+
+        (* b *)
+        pose proof (H b). 
+        assert (b < PArray.length t_atom).
+        { apply PArray.get_not_default_lt. rewrite def_t_atom. rewrite Heq6, Heq7. easy. }
+        specialize (@H2 H4). rewrite Heq6 in H2. simpl in H2.
+        unfold get_type' in H2. unfold v_type in H2.
+        case_eq (t_interp .[ b]).
+        intros v_typeb v_valb Htib. rewrite Htib in H2.
+        rewrite Atom.t_interp_wf in Htib; trivial.
+        rewrite Heq6, Heq7 in Htib. simpl in Htib.
+        rewrite Ha in Htib.
+        unfold Bval in Htib.
+        rewrite Heq7 in H2. simpl in H2.
+        inversion Htib.
+
+        generalize dependent v_valb.
+        rewrite <- H6. intros.
+
+        (* f *)
+        pose proof (H f). 
+        assert (f < PArray.length t_atom).
+        { apply PArray.get_not_default_lt. rewrite def_t_atom. rewrite Heq3. easy. }
+        specialize (@H5 H7). rewrite Heq3 in H5. simpl in H5.
+        unfold get_type' in H5. unfold v_type in H5.
+        case_eq (t_interp .[ f]).
+        intros v_typef v_valf Htif. rewrite Htif in H5.
+        rewrite Atom.t_interp_wf in Htif; trivial.
+        rewrite Heq3 in Htif. simpl in Htif.
+        rewrite !Atom.t_interp_wf in Htif; trivial.
+        rewrite Heq4, Heq6 in Htif.
+        rewrite Heq5, Heq7 in Htif.
+        simpl in Htif.
+        rewrite Hb, Ha in Htif.
+        rewrite Typ.nat_cast_refl in Htif.
+        unfold Bval in Htif.
+        rewrite !andb_true_iff in H5.
+        destruct H5. destruct H5.
+
+        inversion Htif.
+
+        generalize dependent v_valf.
+        rewrite <- H11. intros.
+
+        unfold Typ.i_eqb, Typ.interp_compdec. simpl.
+        rewrite <- Hb.
+        apply diseq_neg_eqw. now rewrite Ha, Hb. 
+
+        easy.
+Qed.
 
 
 
@@ -9504,174 +9593,7 @@ Proof. induction n.
        specialize (@IHn n0 Hm). now rewrite IHn.
 Qed.
 
-Lemma diseq_neg_eq: forall (la lb: list bool),
-      List_diseqb la lb = true -> negb (RAWBITVECTOR_LIST.beq_list la lb) = true.
-Proof. intro la.
-       induction la.
-       - intros. simpl in H. case lb in *.
-           now contradict H.
-           now simpl.
-       - intros.
-         simpl in *.
-         case lb in *.
-          easy.
-          case_eq (Bool.eqb a false).
-          intros. rewrite H0 in H.
-          case_eq (Bool.eqb b false).
-          intros. rewrite H1 in H.
-          case a in *. now contradict H0.
-          case b in *. now contradict H1.
-          simpl.
-          apply IHla. easy.
-          case a in *. now contradict H0.
-          case b in *. intros.
-          now simpl.
-          intros. simpl.
-          apply IHla.
-          simpl in H. easy.
-          intros. rewrite H0 in H.
-          case_eq (Bool.eqb b true ). intros.
-          case a in *. 
-          case b in *. simpl.
-          apply IHla. simpl in H. easy.
-          now simpl.
-          now contradict H0.
-          intros.
-          case a in *.
-          case b in *. simpl in *. now contradict H1.
-          now simpl in *.
-          case b in *. now simpl in *.
-          simpl in *. now contradict H.
-Qed.
 
-Lemma valid_check_bbDiseq lres : C.valid rho (check_bbDiseq lres).
-Proof. 
-      unfold check_bbDiseq.
-      case_eq (Lit.is_pos lres); intro Heq; simpl; try now apply C.interp_true.
-      case_eq (t_form .[ Lit.blit lres]); try (intros; now apply C.interp_true).
-        intros f Heq2.
-      case_eq (t_atom .[ f]); try (intros; now apply C.interp_true).
-
-      intros [ | | | | | | |[ A B | A| | | | | ]|N|N|N|N|N|N|N|N|N| | ];
-         try (intros; now apply C.interp_true). intros n a b Heq3.
-      case_eq (t_atom .[ a]); try (intros; now apply C.interp_true).
-      intros c Heq4.
-      case_eq c; try (intros; now apply C.interp_true).
-      intros la n1 Heq5.
-      case_eq (t_atom .[ b]); try (intros; now apply C.interp_true).
-      intros c0 Heq6.
-      case_eq c0; try (intros; now apply C.interp_true).
-      intros lb n2 Heq7.
-      case_eq (List_diseqb la lb && (N.of_nat (Datatypes.length la) =? n)%N
-              && (N.of_nat (Datatypes.length lb) =? n)%N 
-              && (n1 =? n)%N && (n2 =? n)%N);
-         try (intros; now apply C.interp_true). intros Heq8.
-
-      unfold C.valid. simpl. rewrite orb_false_r.
-      unfold Lit.interp. rewrite Heq.
-      unfold Var.interp.
-      rewrite wf_interp_form; trivial. rewrite Heq2. simpl.
-      unfold Atom.interp_form_hatom, interp_hatom.
-      rewrite Atom.t_interp_wf; trivial.
-      rewrite Heq3. simpl.
-      rewrite !Atom.t_interp_wf; trivial.
-      rewrite Heq4, Heq6. simpl.
-      rewrite Heq5, Heq7. simpl.
-
-        rewrite !andb_true_iff in Heq8.
-        destruct Heq8 as (((Heq8, Ha), Hb), Hc).
-        destruct Heq8 as (Heq8, Hd).
-        rewrite N.eqb_eq in Hb, Hc.
-        rewrite Hb, Hc.
-        rewrite Typ.N_cast_refl. simpl.
-
-        generalize wt_t_atom. unfold Atom.wt. unfold is_true.
-        rewrite PArray.forallbi_spec;intros.
-
-        (* a *)
-        pose proof (H a). 
-        assert (a < PArray.length t_atom).
-        { apply PArray.get_not_default_lt. rewrite def_t_atom. rewrite Heq4, Heq5. easy. }
-        specialize (@H0 H1). rewrite Heq4 in H0. simpl in H0.
-        unfold get_type' in H0. unfold v_type in H0.
-        case_eq (t_interp .[ a]).
-        intros v_typea v_vala Htia. rewrite Htia in H0.
-        rewrite Atom.t_interp_wf in Htia; trivial.
-        rewrite Heq4, Heq5 in Htia. simpl in Htia.
-        rewrite Hb in Htia.
-        unfold Bval in Htia.
-        rewrite Heq5 in H0. simpl in H0.
-        inversion Htia.
-
-        generalize dependent v_vala.
-        rewrite <- H3. intros.
-
-        (* b *)
-        pose proof (H b). 
-        assert (b < PArray.length t_atom).
-        { apply PArray.get_not_default_lt. rewrite def_t_atom. rewrite Heq6, Heq7. easy. }
-        specialize (@H2 H4). rewrite Heq6 in H2. simpl in H2.
-        unfold get_type' in H2. unfold v_type in H2.
-        case_eq (t_interp .[ b]).
-        intros v_typeb v_valb Htib. rewrite Htib in H2.
-        rewrite Atom.t_interp_wf in Htib; trivial.
-        rewrite Heq6, Heq7 in Htib. simpl in Htib.
-        rewrite Hc in Htib.
-        unfold Bval in Htib.
-        rewrite Heq7 in H2. simpl in H2.
-        inversion Htib.
-
-        generalize dependent v_valb.
-        rewrite <- H6. intros.
-
-        (* f *)
-        pose proof (H f). 
-        assert (f < PArray.length t_atom).
-        { apply PArray.get_not_default_lt. rewrite def_t_atom. rewrite Heq3. easy. }
-        specialize (@H5 H7). rewrite Heq3 in H5. simpl in H5.
-        unfold get_type' in H5. unfold v_type in H5.
-        case_eq (t_interp .[ f]).
-        intros v_typef v_valf Htif. rewrite Htif in H5.
-        rewrite Atom.t_interp_wf in Htif; trivial.
-        rewrite Heq3 in Htif. simpl in Htif.
-        rewrite !Atom.t_interp_wf in Htif; trivial.
-        rewrite Heq4, Heq6 in Htif.
-        rewrite Heq5, Heq7 in Htif.
-        simpl in Htif.
-        rewrite Hb, Hc in Htif.
-        rewrite Typ.N_cast_refl in Htif.
-        unfold Bval in Htif.
-        rewrite !andb_true_iff in H5.
-        destruct H5. destruct H5.
-
-        inversion Htif.
-
-        generalize dependent v_valf.
-        rewrite <- H11. intros.
-
-        unfold BITVECTOR_LIST._of_bits, RAWBITVECTOR_LIST._of_bits.
-        rewrite N.eqb_eq in Ha, Hd.
-
-        generalize (BITVECTOR_LIST._of_bits_size la n).
-
-        unfold BITVECTOR_LIST._of_bits, RAWBITVECTOR_LIST._of_bits.
-
-        rewrite Hd.
-
-        generalize (BITVECTOR_LIST._of_bits_size lb n).
-        unfold BITVECTOR_LIST._of_bits, RAWBITVECTOR_LIST._of_bits.
-        rewrite Ha.
-        intros.
-
-        unfold Typ.i_eqb. simpl.
-        unfold BITVECTOR_LIST.bv_eq, RAWBITVECTOR_LIST.bv_eq.
-        simpl.
-        rewrite e, e0.
-        rewrite N.eqb_refl.
-        unfold RAWBITVECTOR_LIST.bits.
-
-        apply diseq_neg_eq. easy.
-Qed.
 
 Lemma prop_checkbb: forall (a: int) (bs: list _lit) (i n: nat),
                     (length bs = (n - i))%nat ->

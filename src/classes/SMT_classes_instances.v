@@ -207,12 +207,31 @@ Section BV.
     apply H. easy.
   Defined.
 
+  Instance Word_ord n : OrdType (word n).
+  Proof.
+    exists (fun a b => (wltb a b)).
+    unfold wltb.
+    intros x y z; destruct x, y, z; try easy.
+    intros. contradict H0. admit. intros. admit.
+    intros. admit.
+    admit. admit.
+
+    intros. admit.
+Admitted.
+
   Instance BV_eqbtype n : EqbType (bitvector n) :=
     {| eqb := @bv_eq n;
        eqb_spec := @bv_eq_reflect n |}.
 
+  Instance Word_eqbtype n : EqbType (word n) :=
+    {| eqb := @weqb n;
+       eqb_spec := @weqb_true_iff n |}.
+
   Instance BV_dec n : DecType (bitvector n) :=
     EqbToDecType _ (BV_eqbtype n).
+
+  Instance Word_dec n : DecType (word n) :=
+    EqbToDecType _ (Word_eqbtype n).
 
   
   Instance BV_comp n: Comparable (bitvector n).
@@ -253,9 +272,17 @@ Section BV.
     now apply RAWBITVECTOR_LIST.rev_neq in H.
   Defined.
 
+  Instance Word_comp n: Comparable (word n).
+  Proof.
+    constructor.
+    intros x y. admit.
+  Admitted.
+
   Instance BV_inh n : Inhabited (bitvector n) :=
     {| default_value := zeros n |}.
 
+  Instance Word_inh n : Inhabited (word n) :=
+    {| default_value := wzero n |}.
 
   Instance BV_compdec n: CompDec (bitvector n) := {|
     Eqb := BV_eqbtype n;                                    
@@ -264,8 +291,12 @@ Section BV.
     Inh := BV_inh n
   |}.
 
-  Instance Word_compdec n: CompDec (word n).
-  Admitted.
+  Instance Word_compdec n: CompDec (word n) := {|
+    Eqb := Word_eqbtype n;                                    
+    Ordered := Word_ord n;                                    
+    Comp := Word_comp n;
+    Inh := Word_inh n
+  |}.
 
 End BV.
 

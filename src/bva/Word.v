@@ -10,23 +10,12 @@ Import ListNotations.
 Set Implicit Arguments.
 
 
-(*
-Module Type W2L.
-
-Parameter word: nat -> Set.
-
-End W2L.
-*)
-
 (** * Basic definitions and conversion to and from [nat] *)
-
-(*Module WORD <: W2L.*)
 
 Inductive word : nat -> Set :=
 | WO : word O
 | WS : bool -> forall n, word n -> word (S n).
 
-(*Definition word := _word.*)
 
 Fixpoint wordToNat sz (w : word sz) : nat :=
   match w with
@@ -115,6 +104,8 @@ Fixpoint Npow2 (n : nat) : N :=
   end%N.
 
 
+
+
 (** *)
 Fixpoint wordToList n (w : word n) : list bool :=
   match w with
@@ -191,6 +182,8 @@ Proof. intros.
 Qed.
 
 (** *)
+
+
 Ltac rethink :=
   match goal with
     | [ H : ?f ?n = _ |- ?f ?m = _ ] => replace m with n; simpl; auto
@@ -330,8 +323,6 @@ Fixpoint wmsb sz (w : word sz) (a : bool) : bool :=
     | @WS b _ x => wmsb x b
   end.
 
-Compute @wmsb 3 (WS false (WS false (WS true WO))) false.
-
 Definition whd sz (w : word (S sz)) : bool :=
   match w in (word sz') return match sz' with
                                | O => unit
@@ -341,8 +332,6 @@ Definition whd sz (w : word (S sz)) : bool :=
     | @WS b _ _ => b
   end.
 
-Compute @whd 3 (WS false (WS false (WS true (WS false WO)))).
-
 Definition wtl sz (w : word (S sz)) : word sz :=
   match w in word sz' return match sz' with
                                | O => unit
@@ -351,8 +340,6 @@ Definition wtl sz (w : word (S sz)) : word sz :=
     | WO => tt
     | @WS _ _ w' => w'
   end.
-
-Compute @wtl 3 (WS false (WS false (WS true (WS false WO)))).
 
 Theorem WS_neq : forall b1 b2 sz (w1 w2 : word sz),
   (b1 <> b2 \/ w1 <> w2)
@@ -451,15 +438,11 @@ Fixpoint combine (sz1 : nat) (w : word sz1) : forall sz2, word sz2 -> word (sz1 
     | @WS b _ w' => fun _ w'' => WS b (combine w' w'')
   end.
 
-Compute @combine 2 (WS false (WS true WO)) 3 (WS true (WS false (WS false WO))).
-
 Fixpoint split1 (sz1 sz2 : nat) : word (sz1 + sz2) -> word sz1 :=
   match sz1 with
     | O => fun _ => WO
     | S sz1' => fun w => WS (whd w) (split1 sz1' sz2 (wtl w))
   end.
-
-Compute @split1 2 3 (WS true (WS false (WS false (WS false (WS false WO))))).
 
 Fixpoint split2 (sz1 sz2 : nat) : word (sz1 + sz2) -> word sz2 :=
   match sz1 with
@@ -593,17 +576,6 @@ Definition wordBin (f : N -> N -> N) sz (x y : word sz) : word sz :=
 Definition wplus := wordBin Nplus.
 Definition wmult := wordBin Nmult.
 
-(*
-Let lst := [false; true; true; true; true; false; true].
-Let lst2 := [false; true; true; true; true; false; true].
-Let ind := false.
-Let a := false.
-Compute (ListToword (ind :: lst) (S (length lst)))
-= WS ind (ListToword lst (length lst)).
-
-Compute wordBin N.add (WS a (ListToword lst 6))
-  (WS ind (ListToword lst2 6)).
-*)
 
 Lemma ltWn: forall n, (_ListToword [] n) = wzero n.
 Proof. intros. case_eq n; easy. Qed.
@@ -1343,9 +1315,5 @@ Lemma wplus_cancel : forall sz (a b c : word sz),
   repeat rewrite wplus_unit in H.
   assumption.
 Qed.
-
-(*End WORD.*)
-
-
 
 

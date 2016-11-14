@@ -473,9 +473,7 @@ Module Typ.
         intros.
         unfold i_eqb_eqb.
         destruct t; simpl; auto.
-        unfold i_eqb; simpl.
-        admit.
-      Admitted.
+      Qed.
       
     End Interp_Equality.
 
