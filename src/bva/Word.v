@@ -1125,11 +1125,15 @@ Definition wlt sz (l r : word sz) : Prop :=
 Definition wslt sz (l r : word sz) : Prop :=
   Zlt (wordToZ l) (wordToZ r).
 
+(** *)
+
 Definition wltb sz (l r : word sz) : bool :=
   N.ltb (wordToN l) (wordToN r).
 
 Definition wsltb sz (l r : word sz) : bool :=
   Z.ltb (wordToZ l) (wordToZ r).
+
+(** *)
 
 Notation "w1 > w2" := (@wlt _ w2%word w1%word) : word_scope.
 Notation "w1 >= w2" := (~(@wlt _ w1%word w2%word)) : word_scope.

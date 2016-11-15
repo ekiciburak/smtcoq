@@ -800,7 +800,7 @@ Module Atom.
   Inductive cop : Type := 
    | CO_xH
    | CO_Z0
-   | CO_Word (_: list bool).
+   | CO_Word (s: nat) (_: word s).
 
   Inductive unop : Type :=
    | UO_xO
@@ -868,7 +868,7 @@ Module Atom.
    match o, o' with
    | CO_xH, CO_xH 
    | CO_Z0, CO_Z0 => true
-   | CO_Word l, CO_Word l' => RAWBITVECTOR_LIST.beq_list l l'
+   | CO_Word s1 w1, CO_Word s2 w2 => Nat.eqb s1 s2 && RAWBITVECTOR_LIST.beq_list (wordToList w1) (wordToList w2)
    | _,_ => false
    end.
 
@@ -949,14 +949,34 @@ Module Atom.
       let Hd := fresh "Hd" in
         destruct t as [Heq | Hd];simpl;
           [ | constructor;intros Heq;elim Hd;inversion Heq;trivial].
+  
+  Lemma WOz: forall (w: word 0), w = WO.
+  Proof. now simpl. Qed.
+
+  Lemma wordToList_inj: forall s (x y: word s),
+    wordToList x = wordToList y <-> x = y.
+  Proof. intros s x.
+         induction x; intros.
+         - split; intros; specialize (WOz y); intros; now rewrite H0.
+         - split; intros. rewrite (shatter_word y) in *.
+           simpl in *.
+           case_eq b; case_eq (whd y); intros; rewrite H0, H1 in H.
+           + apply f_equal. apply IHx. now inversion H.
+           + now contradict H.
+           + now contradict H.
+           + apply f_equal. apply IHx. now inversion H.
+           + now rewrite H.
+  Qed.
 
   Lemma reflect_cop_eqb : forall o1 o2, reflect (o1 = o2) (cop_eqb o1 o2).
   Proof.
     destruct o1; destruct o2; simpl; try (constructor; trivial; discriminate).
     apply iff_reflect. split. intro.
-    inversion H. apply RAWBITVECTOR_LIST.List_eq_refl; auto.
-      intros. rewrite RAWBITVECTOR_LIST.List_eq in H.
-        now rewrite H.
+    inversion H. rewrite andb_true_iff.
+    split; [ apply Nat.eqb_refl | apply RAWBITVECTOR_LIST.List_eq_refl; exact nil].
+    intros. rewrite andb_true_iff in H. destruct H as (Ha, Hb).
+    apply Nat.eqb_eq in Ha. apply RAWBITVECTOR_LIST.List_eq in Hb. subst.
+    apply wordToList_inj in Hb.  now rewrite Hb.
   Qed.
 
   Lemma reflect_uop_eqb : forall o1 o2, reflect (o1 = o2) (uop_eqb o1 o2).
@@ -1167,7 +1187,7 @@ Qed.
         match o with
         | CO_xH => Typ.Tpositive 
         | CO_Z0 => Typ.TZ
-        | CO_Word l => Typ.TWord (Datatypes.length l)
+        | CO_Word s w => Typ.TWord s
         end.
 
       Definition typ_uop o :=
@@ -1586,7 +1606,7 @@ Qed.
         match o with
         | CO_xH => Bval Typ.Tpositive xH
         | CO_Z0 => Bval Typ.TZ Z0
-        | CO_Word l => Bval (Typ.TWord (Datatypes.length l)) (Word.ListToword l (Datatypes.length l))
+        | CO_Word s w => Bval (Typ.TWord s) w
         end.
 
       Definition interp_uop o :=
@@ -2131,7 +2151,7 @@ Qed.
         destruct op; simpl; intro H.
         discriminate (H Typ.Tpositive).
         discriminate (H Typ.TZ).
-        specialize (H (Typ.TWord (Datatypes.length l))). simpl in H. rewrite Nat.eqb_refl in H. now contradict H.
+        specialize (H (Typ.TWord s)). simpl in H. rewrite Nat.eqb_refl in H. now contradict H.
         (* Unary operators *)
         destruct op; simpl; intro H; destruct (check_aux_interp_hatom h) as [v Hv];
           rewrite Hv; simpl; rewrite Typ.neq_cast;
@@ -2483,7 +2503,7 @@ Qed.
         intros [ | | ] _; simpl.
         exists 1%positive; auto.
         exists 0%Z; auto.
-        exists (Word.ListToword l (Datatypes.length l)); auto.
+        exists w; auto.
        Admitted.
 (*
         (* Unary operators *)
