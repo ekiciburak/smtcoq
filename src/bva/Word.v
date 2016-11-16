@@ -1017,6 +1017,8 @@ Definition wor := bitwp orb.
 Definition wand := bitwp andb.
 Definition wxor := bitwp xorb.
 
+Definition wbitOf (s: nat) (w: word s) (n: nat) := nth n (wordToList w) false.
+
  Check wand.
 
 Notation "l ^| r" := (@wor _ l%word r%word) (at level 50, left associativity).

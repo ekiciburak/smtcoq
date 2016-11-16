@@ -47,26 +47,53 @@ Section Checker.
   Local Notation get_form := (PArray.get t_form) (only parsing).
   Local Notation get_atom := (PArray.get t_atom) (only parsing).
 
+ (** * Bit-blasting a variable:
+
+              x ∈ BV n
+       ----------------------- bbVar
+        bbT(x, [x₀; ...; xₙ₋₁])
+   *)
+
+  Fixpoint check_bb (a: int) (bs: list _lit) (i n: nat) :=
+    match bs with
+    | nil => Nat_eqb i n                     (* We go up to n *)
+    | b::bs =>
+      if Lit.is_pos b then
+        match get_form (Lit.blit b) with
+        | Fatom a' =>
+          match get_atom a' with
+          | Auop (UO_BVbitOf N p) a' =>
+            (* TODO:
+               Do not need to check [Nat_eqb l (N.to_nat N)] at every iteration *)
+            if (a == a')                     (* We bit blast the right bv *)
+                 && (Nat_eqb i p)            (* We consider bits after bits *)
+                 && (Nat_eqb n N)            (* The bv has indeed type BV n *)
+            then check_bb a bs (S i) n
+            else false
+          | _ => false
+          end
+        | _ => false
+        end
+      else false
+    end.
+
+  (** Checker for bitblasting of bitvector variables *)
+  Definition check_bbVar lres :=
+    if Lit.is_pos lres then
+      match get_form (Lit.blit lres) with
+      | FbbT a bs =>
+        if check_bb a bs O (List.length bs)%N
+        then lres::nil
+        else C._true
+      | _ => C._true
+      end
+    else C._true.
+
   (** * Bit-blasting a constant bitvector:
 
        --------------------------- bbConst
         bbT(#b0010, [0; 1; 0; 0])
    *)
-
-(*
-  Fixpoint check_bbc (a_bv: list bool) (bs: list _lit) :=
-    match a_bv, bs with
-    | nil, nil => true
-    | v :: a_bv, b::bs =>
-      if Lit.is_pos b then
-        match get_form (Lit.blit b), v with
-          | Ftrue, true | Ffalse, false => check_bbc a_bv bs
-          | _, _ => false
-        end
-      else false
-    | _, _ => false
-    end.
-*)
 
   Fixpoint check_bbc s (w: word s) (bs: list _lit) :=
     match w, bs with
@@ -142,10 +169,6 @@ Fixpoint check_symopp (bs1 bs2 bsres : list _lit) (bvop: binop)  :=
     | _, _, _ => false
     end.
 
-  Lemma empty_list_length: forall {A: Type} (a: list A), (length a = 0)%nat <-> a = [].
-  Proof. intros A a.
-         induction a; split; intros; auto; contradict H; easy.
-  Qed.
 
 
   (** Checker for bitblasting of bitwise operators on bitvectors *)
@@ -741,49 +764,8 @@ Fixpoint check_symopp (bs1 bs2 bsres : list _lit) (bvop: binop)  :=
       end
     else C._true.
 
+ 
 (*
-
-  (** * Bit-blasting a variable:
-
-              x ∈ BV n
-       ----------------------- bbVar
-        bbT(x, [x₀; ...; xₙ₋₁])
-   *)
-
-  Fixpoint check_bb (a: int) (bs: list _lit) (i n: nat) :=
-    match bs with
-    | nil => Nat_eqb i n                     (* We go up to n *)
-    | b::bs =>
-      if Lit.is_pos b then
-        match get_form (Lit.blit b) with
-        | Fatom a' =>
-          match get_atom a' with
-          | Auop (UO_BVbitOf N p) a' =>
-            (* TODO:
-               Do not need to check [Nat_eqb l (N.to_nat N)] at every iteration *)
-            if (a == a')                     (* We bit blast the right bv *)
-                 && (Nat_eqb i p)            (* We consider bits after bits *)
-                 && (Nat_eqb n (N.to_nat N)) (* The bv has indeed type BV n *)
-            then check_bb a bs (S i) n
-            else false
-          | _ => false
-          end
-        | _ => false
-        end
-      else false
-    end.
-
-  (** Checker for bitblasting of bitvector variables *)
-  Definition check_bbVar lres :=
-    if Lit.is_pos lres then
-      match get_form (Lit.blit lres) with
-      | FbbT a bs =>
-        if check_bb a bs O (List.length bs)%N
-        then lres::nil
-        else C._true
-      | _ => C._true
-      end
-    else C._true.
 
   Variable s : S.t.
 
@@ -915,7 +897,10 @@ Fixpoint check_symopp (bs1 bs2 bsres : list _lit) (bvop: binop)  :=
     end.
 
 *)
-  Section Proof.
+
+
+
+ Section Proof.
 
     Variables (t_i : array typ_compdec)
               (t_func : array (Atom.tval t_i))
@@ -977,6 +962,7 @@ Fixpoint check_symopp (bs1 bs2 bsres : list _lit) (bvop: binop)  :=
       Hypothesis wf_t_i : wf.
       Variable interp_wordatom : atom -> forall s, Word.word s.
       Notation atom := int (only parsing).
+
 
   Fixpoint interp_carry (c: carry) : bool :=
     match c with
@@ -1069,6 +1055,293 @@ Qed.
 
 Lemma eq_head: forall {A: Type} a b (l: list A), (a :: l) = (b :: l) <-> a = b.
 Proof. intros A a b l; split; [intros H; inversion H|intros ->]; auto. Qed.
+
+
+
+Lemma id'' a : N.of_nat (N.to_nat a) = a.
+Proof.
+ destruct a as [ | p]; simpl; trivial.
+ destruct (Pos2Nat.is_succ p) as (n,H). rewrite H. simpl. f_equal.
+ apply Pos2Nat.inj. rewrite H. apply SuccNat2Pos.id_succ.
+Qed.
+
+Lemma inj a a' : N.to_nat a = N.to_nat a' -> a = a'.
+Proof.
+ intro H. rewrite <- (id'' a), <- (id'' a'). now f_equal.
+Qed.
+
+Lemma inj_iff a a' : N.to_nat a = N.to_nat a' <-> a = a'.
+Proof.
+ split. apply inj. intros; now subst.
+Qed.
+
+Lemma id' n : N.to_nat (N.of_nat n) = n.
+Proof.
+ induction n; simpl; trivial. apply SuccNat2Pos.id_succ.
+Qed.
+
+
+Lemma nth_eq1: forall i a xs,
+nth (S i) (a :: xs) 1 = nth i xs 1.
+Proof. intros.
+       now simpl.
+Qed.
+
+Lemma le_le_S_eq : forall (n m: nat), (n <= m)%nat -> (S n <= m)%nat \/ n = m.
+Proof le_lt_or_eq.
+
+
+Lemma prop_checkbb: forall (a: int) (bs: list _lit) (i n: nat),
+                    (length bs = (n - i))%nat ->
+                    (check_bb a bs i n = true) ->
+                    (forall i0, (i <= i0 < n )%nat ->
+                    Lit.interp rho (nth (i0 - i) bs 1) = 
+                    (@RAWBITVECTOR_LIST.bitOf i0 (wordToList (interp_form_hatom_word a n)))).
+Proof. intros a bs.
+       revert a.
+       induction bs as [ | b ys IHys].
+       - intros. simpl in H. 
+         cut (i = n). intro Hn. rewrite Hn in H1.
+         contradict H1. omega. omega.
+       - intros. simpl in H0.
+         case_eq (Lit.is_pos b). intros Heq0. rewrite Heq0 in H0.
+         case_eq (t_form .[ Lit.blit b] ). intros i1 Heq1. rewrite Heq1 in H0.
+         case_eq (t_atom .[ i1]). intros c Heq2. 
+         rewrite Heq2 in H0; now contradict H0.
+         intros u i2 Heq2. 
+         rewrite Heq2 in H0.
+         case_eq u; try (intro Heq'; rewrite Heq' in H0; now contradict H0).
+
+         intros. rewrite H2 in H0.
+         intros. now contradict H0.
+         intros. rewrite H2 in H0. now contradict H0.
+         intros. rewrite H2 in H0. now contradict H0.
+         intros. rewrite H2 in H0. now contradict H0.
+         intros. rewrite H2 in H0.
+         case_eq ((a == i2) && Nat_eqb i n1 && Nat_eqb n n0). intros Hif.
+         rewrite Hif in H0.
+         do 2 rewrite andb_true_iff in Hif. destruct Hif as ((Hif0 & Hif1) & Hif2).
+         specialize (@IHys a (S i) n).
+         inversion H.
+         cut (Datatypes.length ys = (n - S i)%nat). intro HSi.
+         specialize (@IHys HSi H0).
+
+         cut (((S i) <= i0 < n)%nat \/ i = i0).
+         intro Hd. destruct Hd as [Hd | Hd].
+         inversion Hd.
+         induction i0 as [ | k IHk].
+         now contradict H3.
+         specialize (@IHys (S k)).
+         cut ((S k - i)%nat = S (k - i)%nat). intro ISk.
+         rewrite ISk.
+         rewrite (@nth_eq1 (k - i) b ys).
+         cut ((S k - S i)%nat = (k - i)%nat). intro ISki.
+         specialize (@IHys Hd).
+         now rewrite ISki in IHys.
+         now simpl. omega.
+         rewrite Hd.
+         cut ((i0 - i0 = 0)%nat). intro Hi0. rewrite Hi0.
+         simpl.
+
+         unfold Lit.interp.
+         rewrite Heq0.
+         unfold Var.interp.
+         rewrite rho_interp.
+         rewrite Heq1.
+
+         rewrite Lit.eqb_spec in Hif0.
+         rewrite Hif0. rewrite <- Hd.
+
+         generalize wt_t_atom. unfold Atom.wt. unfold is_true.
+         rewrite PArray.forallbi_spec;intros.
+         assert (i1 < PArray.length t_atom).
+         {
+           apply PArray.get_not_default_lt.
+           rewrite Heq2. now rewrite def_t_atom.
+         }
+
+         specialize (@H3 i1 H5).
+         rewrite Heq2 in H3. simpl in H3.
+         rewrite H2 in H3. simpl in H3.
+         rewrite !andb_true_iff in H3.
+         decompose [and] H3. clear H3.
+         simpl in H7.
+
+         unfold get_type' in H6, H7.
+         unfold v_type in H6, H7.
+         case_eq (t_interp .[ i1]).
+         intros. rewrite H3 in H6. simpl in H6.
+         case_eq (v_type0); intros; try (rewrite H8 in H6; now contradict H6).
+         simpl.
+
+         unfold Atom.interp_form_hatom_word.
+         unfold Atom.interp_form_hatom.
+         unfold Atom.interp_hatom.
+         rewrite Atom.t_interp_wf; trivial.
+         rewrite Heq2.
+         simpl.
+
+         rewrite H2. simpl.
+         cut (i = n1). intro Hin1. rewrite Hin1.
+         cut (n = n0). intro Hnn0.
+         rewrite Hnn0.
+         case_eq (t_interp .[ i2]).
+
+         intros. rewrite H9 in H7. rewrite <- H9.
+         case_eq v_type1; intros; rewrite H10 in H7; try (now contradict H7).
+         cut (n2 = n0)%N. intros Hn2n0. rewrite Hn2n0 in H10. 
+
+         rewrite H9. simpl.
+         unfold interp_bool.
+         case_eq (Typ.cast v_type1 (Typ.TWord n0)).
+         (* split *)
+         split. rewrite H10.
+         simpl.
+         rewrite Typ.nat_cast_refl. intros.
+         contradict H11. easy.
+
+         apply Typ.eqb_spec in H7. inversion H7. easy.
+
+         now apply Nat.eqb_eq in Hif2.
+         now apply Nat.eqb_eq in Hif1.
+
+         omega.
+         destruct H1.
+         specialize (@le_le_S_eq i i0). intros H11.
+         specialize (@H11 H1).
+         destruct H11. left. split. exact H5. exact H3.
+         right. exact H5.
+         omega.
+         intro H3. rewrite H3 in H0. now contradict H0.
+         intros i3 n0 n1 Heq. rewrite Heq in H0. now contradict H0.
+         intros n0 i2 i3 i4 Heq. rewrite Heq in H0. now contradict H0.
+         intros n0 i3 Heq. rewrite Heq in H0. now contradict H0. 
+         intros  i2 i3 Heq. rewrite Heq in H0. now contradict H0.
+         intros  Heq. rewrite Heq in H0. now contradict H0.
+         intros  Heq. rewrite Heq in H0. now contradict H0.
+         intros i1 i2 Heq. rewrite Heq in H0. now contradict H0.
+         intros a0 Heq. rewrite Heq in H0. now contradict H0.
+         intros a0 Heq. rewrite Heq in H0. now contradict H0.
+         intros a0 Heq. rewrite Heq in H0. now contradict H0.
+         intros i1 i2 Heq. rewrite Heq in H0. now contradict H0.
+         intros i1 i2 Heq. rewrite Heq in H0. now contradict H0.
+         intros i1 i2 i3 Heq. rewrite Heq in H0. now contradict H0.
+         intros i1 l Heq. rewrite Heq in H0. now contradict H0.
+         intros Heq. rewrite Heq in H0. now contradict H0.
+Qed.
+
+Lemma prop_checkbb': forall (a: int) (bs: list _lit),
+                     (check_bb a bs 0 (length bs) = true) ->
+                     (forall i0, (i0 < (length bs) )%nat ->
+                     (Lit.interp rho  (nth i0 bs 1)) = 
+                     (@RAWBITVECTOR_LIST.bitOf i0 
+                     (wordToList (interp_form_hatom_word a (length bs))))).
+Proof. intros.
+       specialize (@prop_checkbb a bs 0 (length bs)).
+       intros Hp.
+       cut ((i0 - 0)%nat = i0%nat).
+       intro Hc.
+       cut (Datatypes.length bs = (Datatypes.length bs - 0)%nat).
+       intro Hc2.
+       specialize (@Hp Hc2 H i0).
+       cut ( (0 <= i0 < Datatypes.length bs)%nat). intro Hc3.
+       specialize (@Hp Hc3).
+       now rewrite Hc in Hp.
+       omega. omega. omega.
+Qed.
+
+  Lemma empty_list_length: forall {A: Type} (a: list A), (length a = 0)%nat <-> a = [].
+  Proof. intros A a.
+         induction a; split; intros; auto; contradict H; easy.
+  Qed.
+
+
+Lemma nth_eq0: forall i a b xs ys,
+nth (S i) (a :: xs) false = nth (S i) (b :: ys) false -> nth i xs false = nth i ys false.
+Proof. intros.
+       now simpl in H.
+Qed.
+
+Lemma nth_eq: forall (a b: list bool), (length a) = (length b) -> 
+ (forall (i: nat), 
+ (i < length a)%nat ->
+ nth i a false = nth i b false) -> a = b.
+Proof. intros a.
+       induction a as [ | a xs IHxs].
+       - intros. simpl in *. symmetry in H.
+         now rewrite empty_list_length in H.
+       - intros [ | b ys] H0.
+         + simpl in *. now contradict H0.
+         + specialize (@IHxs ys).
+           inversion H0. specialize (@IHxs H1).
+           intros.         
+           pose proof (@H 0%nat). simpl in H2.
+           cut ((0 < S (Datatypes.length xs))%nat). intro HS.
+           specialize (@H2 HS). rewrite H2; apply f_equal.
+           apply IHxs. intros. apply (@nth_eq0 i a b xs ys).
+           apply H. simpl. omega. omega.
+Qed.
+
+Lemma is_even_0: is_even 0 = true.
+Proof. apply refl_equal. Qed.
+
+Lemma rho_1: Lit.interp rho 1 = false.
+Proof. unfold Lit.interp.
+       unfold Lit.is_pos.
+       simpl.
+       cut (is_even 1 = false). intro Hev. rewrite Hev.
+       unfold Var.interp.
+       destruct wf_rho. unfold Lit.blit.
+       cut (1 >> 1 = 0). intros Heq0. rewrite Heq0. 
+       unfold negb. now rewrite H.
+       easy. easy.
+Qed.
+
+Lemma rho_false: Lit.interp rho false = true.
+Proof. unfold Lit.interp.
+       unfold Lit.is_pos.
+       simpl.
+       cut (is_even 0 = true). intro Hev. rewrite Hev.
+       unfold Var.interp.
+       destruct wf_rho. simpl. unfold Lit.blit.
+       cut (0 >> 1 = 0). intros Heq0. rewrite Heq0. exact H.
+       now rewrite lsr_0_l.
+       apply is_even_0.
+Qed.
+
+Lemma bitOf_of_bitsw: forall a l, 
+                               (forall i, 
+                               (i < (length l))%nat ->
+                               nth i l false = 
+                               (@RAWBITVECTOR_LIST.bitOf i (wordToList (interp_form_hatom_word a (length l)) )))
+                               ->
+                                wordToList (interp_form_hatom_word a (length l)) = l.
+Proof. intros. apply nth_eq. now rewrite len_wordToList.
+       intros. symmetry. apply H. now rewrite len_wordToList in H0.
+Qed.
+
+Lemma valid_check_bbVar lres : C.valid rho (check_bbVar lres).
+Proof.
+      unfold check_bbVar.
+      case_eq (Lit.is_pos lres); intro Heq1; [ |now apply C.interp_true].
+      case_eq (t_form .[ Lit.blit lres]); try (intros; now apply C.interp_true).
+      intros a bs Heq0.
+      case_eq (check_bb a bs 0 (Datatypes.length bs)); intro Heq2; [ |now apply C.interp_true].
+      unfold C.valid. simpl. rewrite orb_false_r.
+      unfold Lit.interp. rewrite Heq1.
+      unfold Var.interp.
+      rewrite wf_interp_form; trivial. rewrite Heq0. simpl.
+      rewrite !map_length.
+      rewrite weqb_true_iff. apply wordToList_inj.
+      rewrite W2L_involutive. specialize (@bitOf_of_bitsw a (map (Lit.interp rho) bs)); intros.
+      rewrite map_length in H. apply H.
+
+      intros.
+      cut (Lit.interp rho 1 = false). intro Hr. rewrite <- Hr. 
+      rewrite map_nth. apply prop_checkbb'. easy. easy.
+      apply rho_1. now rewrite map_length.
+Qed.
+
 
 Axiom afold_left_and : forall a, 
       afold_left bool int true andb (Lit.interp rho) a = List.forallb (Lit.interp rho) (to_list a).
@@ -2869,7 +3142,7 @@ Proof.
       case_eq (t_form .[ Lit.blit lres]); try (intros; now apply C.interp_true).
       intros a bsres Heq5.
       case_eq (t_atom .[ a]); try (intros; now apply C.interp_true).
-      intros [ | | | | | | | | ]  a1'  Heq6; try (intros; now apply C.interp_true).
+      intros [ | | | | | | | | | ]  a1'  Heq6; try (intros; now apply C.interp_true).
       (* BVzextend *)
     - case_eq ((a1 == a1')); simpl; intros Heq7; try (now apply C.interp_true).
         case_eq (
@@ -6531,7 +6804,7 @@ Proof.
       case_eq (t_form .[ Lit.blit lres]); try (intros; now apply C.interp_true).
       intros a bsres Heq8.
       case_eq (t_atom .[ a]); try (intros; now apply C.interp_true).
-      intros [ | | | | | | | | ] a1' Heq9; try now apply C.interp_true.
+      intros [ | | | | | | | | | ] a1' Heq9; try now apply C.interp_true.
 
       case_eq ((a1 == a1') && check_neg bs1 bsres &&
       ((Datatypes.length bs1) =? n)%nat); 
@@ -7138,7 +7411,7 @@ Qed.
 
 
 (** incorporated down here *)
-
+  
 
 
 Lemma prop_check_ult11: forall a b, 
@@ -9657,352 +9930,6 @@ Proof. intro bs1.
 Admitted.
 
 
-Lemma mk_list_false_eq: forall bs, (map (fun _ : int => Lit.interp rho Lit._false) bs) =
- (RAWBITVECTOR_LIST.mk_list_false (Datatypes.length bs)).
-Proof. intro bs.
-       induction bs as [ | xbs xsbs IHbs ].
-       - now simpl.
-       - simpl. rewrite IHbs. specialize (@Lit.interp_false rho wf_rho).
-        intros. unfold is_true in H. apply not_true_is_false in H.
-        now rewrite H.
-Qed. 
-
-
-Lemma id'' a : N.of_nat (N.to_nat a) = a.
-Proof.
- destruct a as [ | p]; simpl; trivial.
- destruct (Pos2Nat.is_succ p) as (n,H). rewrite H. simpl. f_equal.
- apply Pos2Nat.inj. rewrite H. apply SuccNat2Pos.id_succ.
-Qed.
-
-Lemma inj a a' : N.to_nat a = N.to_nat a' -> a = a'.
-Proof.
- intro H. rewrite <- (id'' a), <- (id'' a'). now f_equal.
-Qed.
-
-Lemma inj_iff a a' : N.to_nat a = N.to_nat a' <-> a = a'.
-Proof.
- split. apply inj. intros; now subst.
-Qed.
-
-Lemma id' n : N.to_nat (N.of_nat n) = n.
-Proof.
- induction n; simpl; trivial. apply SuccNat2Pos.id_succ.
-Qed.
-
-Lemma nth_eq1: forall i a xs,
-nth (S i) (a :: xs) 1 = nth i xs 1.
-Proof. intros.
-       now simpl.
-Qed.
-
-Theorem nat_case: forall (n:nat) (P:nat -> Prop), P 0%nat -> (forall m:nat, P (S m)) -> P n.
-Proof. induction n; auto. Qed.
-
-Theorem le_lt_or_eq : forall (n m: nat), (n <= m)%nat -> (n < m)%nat \/ n = m.
-Proof.
-induction 1; auto with arith.
-Qed.
-
-Lemma le_le_S_eq : forall (n m: nat), (n <= m)%nat -> (S n <= m)%nat \/ n = m.
-Proof le_lt_or_eq.
-
-Lemma Nat_eqb_eq: forall n m, Nat_eqb n m = true -> n = m.
-Proof. induction n.
-       intros n Hm. simpl in Hm. case_eq n. reflexivity.
-         intros. rewrite H in Hm. now contradict H.
-       intros m Hm.
-       case_eq m. intros. rewrite H in Hm. simpl in Hm.
-        now contradict Hm.
-       intros. rewrite H in Hm. simpl in Hm.
-       specialize (@IHn n0 Hm). now rewrite IHn.
-Qed.
-
-
-
-Lemma prop_checkbb: forall (a: int) (bs: list _lit) (i n: nat),
-                    (length bs = (n - i))%nat ->
-                    (check_bb a bs i n = true) ->
-                    (forall i0, (i <= i0 < n )%nat ->
-                    Lit.interp rho (nth (i0 - i) bs 1) = 
-                    (@BITVECTOR_LIST.bitOf (N.of_nat n) i0 (interp_form_hatom_bv a (N.of_nat n)))).
-Proof. intros a bs.
-       revert a.
-       induction bs as [ | b ys IHys].
-       - intros. simpl in H. 
-         cut (i = n). intro Hn. rewrite Hn in H1.
-         contradict H1. omega. omega.
-       - intros. simpl in H0.
-         case_eq (Lit.is_pos b). intros Heq0. rewrite Heq0 in H0.
-         case_eq (t_form .[ Lit.blit b] ). intros i1 Heq1. rewrite Heq1 in H0.
-         case_eq (t_atom .[ i1]). intros c Heq2. 
-         rewrite Heq2 in H0; now contradict H0.
-         intros u i2 Heq2. 
-         rewrite Heq2 in H0.
-         case_eq u; try (intro Heq'; rewrite Heq' in H0; now contradict H0).
-
-         intros. rewrite H2 in H0.
-         case_eq ((a == i2) && Nat_eqb i n1 && Nat_eqb n (N.to_nat n0)). intros Hif.
-         rewrite Hif in H0.
-         do 2 rewrite andb_true_iff in Hif. destruct Hif as ((Hif0 & Hif1) & Hif2).
-         specialize (@IHys a (S i) n).
-         inversion H.
-         cut (Datatypes.length ys = (n - S i)%nat). intro HSi.
-         specialize (@IHys HSi H0).
-
-         cut (((S i) <= i0 < n)%nat \/ i = i0).
-         intro Hd. destruct Hd as [Hd | Hd].
-         inversion Hd.
-         induction i0 as [ | k IHk].
-         now contradict H3.
-         specialize (@IHys (S k)).
-         cut ((S k - i)%nat = S (k - i)%nat). intro ISk.
-         rewrite ISk.
-         rewrite (@nth_eq1 (k - i) b ys).
-         cut ((S k - S i)%nat = (k - i)%nat). intro ISki.
-         specialize (@IHys Hd).
-         now rewrite ISki in IHys.
-         now simpl. omega.
-         rewrite Hd.
-         cut ((i0 - i0 = 0)%nat). intro Hi0. rewrite Hi0.
-         simpl.
-
-         unfold Lit.interp.
-         rewrite Heq0.
-         unfold Var.interp.
-         rewrite rho_interp.
-         rewrite Heq1.
-
-         rewrite Lit.eqb_spec in Hif0.
-         rewrite Hif0. rewrite <- Hd.
-
-         generalize wt_t_atom. unfold Atom.wt. unfold is_true.
-         rewrite PArray.forallbi_spec;intros.
-         assert (i1 < PArray.length t_atom).
-         {
-           apply PArray.get_not_default_lt.
-           rewrite Heq2. now rewrite def_t_atom.
-         }
-
-         specialize (@H3 i1 H5).
-         rewrite Heq2 in H3. simpl in H3.
-         rewrite H2 in H3. simpl in H3.
-         rewrite !andb_true_iff in H3.
-         decompose [and] H3. clear H3.
-         simpl in H7.
-
-         unfold get_type' in H6, H7.
-         unfold v_type in H6, H7.
-         case_eq (t_interp .[ i1]).
-         intros. rewrite H3 in H6. simpl in H6.
-         case_eq (v_type0); intros; try (rewrite H8 in H6; now contradict H6).
-         simpl.
-
-         unfold Atom.interp_form_hatom_bv.
-         unfold Atom.interp_form_hatom.
-         unfold Atom.interp_hatom.
-         rewrite Atom.t_interp_wf; trivial.
-         rewrite Heq2.
-         simpl.
-
-         rewrite H2. simpl.
-         cut (i = n1). intro Hin1. rewrite Hin1.
-         cut (n = (N.to_nat n0)). intro Hnn0.
-         rewrite Hnn0. 
-         rewrite id''.
-         case_eq (t_interp .[ i2]).
-
-         intros. rewrite H9 in H7. rewrite <- H9.
-         case_eq v_type1; intros; rewrite H10 in H7; try (now contradict H7).
-         cut (n2 = n0)%N. intros Hn2n0. rewrite Hn2n0 in H10. 
-
-         rewrite H9. simpl.
-         unfold interp_bool.
-         case_eq (Typ.cast v_type1 (Typ.TBV n0)).
-         (* split *)
-         split. rewrite H10.
-         simpl.
-         rewrite Typ.N_cast_refl. intros.
-         contradict H11. easy.
-
-         apply Typ.eqb_spec in H7. inversion H7. easy.
-
-         now apply Nat_eqb_eq in Hif2.
-         now apply Nat_eqb_eq in Hif1.
-
-         omega.
-         destruct H1.
-         specialize (@le_le_S_eq i i0). intros H11.
-         specialize (@H11 H1).
-         destruct H11. left. split. exact H5. exact H3.
-         right. exact H5.
-         omega.
-         intro H3. rewrite H3 in H0. now contradict H0.
-         intros n0 Hn. rewrite Hn in H0. now contradict H0.
-         intros n0 Hn. rewrite Hn in H0. now contradict H0.
-         intros i3 n0 n1 Heq. rewrite Heq in H0. now contradict H0.
-         intros n0 i3 Heq. rewrite Heq in H0. now contradict H0.
-         intros n0 i3 Heq. rewrite Heq in H0. now contradict H0. 
-         intros b0 i2 i3 Heq. rewrite Heq in H0. now contradict H0.
-         intros t i2 i3 i4 Heq. rewrite Heq in H0. now contradict H0.
-         intros n0 l Heq. rewrite Heq in H0. now contradict H0.
-         intros i2 l Heq. rewrite Heq in H0. now contradict H0.
-         intros Heq. rewrite Heq in H0. now contradict H0.
-         intros Heq. rewrite Heq in H0. now contradict H0.
-         intros i1 i2 Heq. rewrite Heq in H0. now contradict H0.
-         intros a0 Heq. rewrite Heq in H0. now contradict H0.
-         intros a0 Heq. rewrite Heq in H0. now contradict H0.
-         intros a0 Heq. rewrite Heq in H0. now contradict H0.
-         intros i1 i2 Heq. rewrite Heq in H0. now contradict H0.
-         intros i1 i2 Heq. rewrite Heq in H0. now contradict H0.
-         intros i1 i2 i3 Heq. rewrite Heq in H0. now contradict H0.
-         intros i1 l Heq. rewrite Heq in H0. now contradict H0.
-         intros Heq. rewrite Heq in H0. now contradict H0.       
-Qed.
-
-Lemma prop_checkbb': forall (a: int) (bs: list _lit),
-                     (check_bb a bs 0 (length bs) = true) ->
-                     (forall i0, (i0 < (length bs) )%nat ->
-                     (Lit.interp rho  (nth i0 bs 1)) = 
-                     (@BITVECTOR_LIST.bitOf (N.of_nat(length bs)) i0 
-                     (interp_form_hatom_bv a (N.of_nat (length bs))))).
-Proof. intros.
-       specialize (@prop_checkbb a bs 0 (length bs)).
-       intros Hp.
-       cut ((i0 - 0)%nat = i0%nat).
-       intro Hc.
-       cut (Datatypes.length bs = (Datatypes.length bs - 0)%nat).
-       intro Hc2.
-       specialize (@Hp Hc2 H i0).
-       cut ( (0 <= i0 < Datatypes.length bs)%nat). intro Hc3.
-       specialize (@Hp Hc3).
-       now rewrite Hc in Hp.
-       omega. omega. omega.
-Qed.
-
-
-Lemma nth_eq0: forall i a b xs ys,
-nth (S i) (a :: xs) false = nth (S i) (b :: ys) false -> nth i xs false = nth i ys false.
-Proof. intros.
-       now simpl in H.
-Qed.
-
-Lemma nth_eq: forall (a b: list bool), (length a) = (length b) -> 
- (forall (i: nat), 
- (i < length a)%nat ->
- nth i a false = nth i b false) -> a = b.
-Proof. intros a.
-       induction a as [ | a xs IHxs].
-       - intros. simpl in *. symmetry in H.
-         now rewrite empty_list_length in H.
-       - intros [ | b ys] H0.
-         + simpl in *. now contradict H0.
-         + specialize (@IHxs ys).
-           inversion H0. specialize (@IHxs H1).
-           intros.         
-           pose proof (@H 0%nat). simpl in H2.
-           cut ((0 < S (Datatypes.length xs))%nat). intro HS.
-           specialize (@H2 HS). rewrite H2; apply f_equal.
-           apply IHxs. intros. apply (@nth_eq0 i a b xs ys).
-           apply H. simpl. omega. omega.
-Qed.
-
-Lemma is_even_0: is_even 0 = true.
-Proof. apply refl_equal. Qed.
-
-Lemma rho_1: Lit.interp rho 1 = false.
-Proof. unfold Lit.interp.
-       unfold Lit.is_pos.
-       simpl.
-       cut (is_even 1 = false). intro Hev. rewrite Hev.
-       unfold Var.interp.
-       destruct wf_rho. unfold Lit.blit.
-       cut (1 >> 1 = 0). intros Heq0. rewrite Heq0. 
-       unfold negb. now rewrite H.
-       easy. easy.
-Qed.
-
-Lemma rho_false: Lit.interp rho false = true.
-Proof. unfold Lit.interp.
-       unfold Lit.is_pos.
-       simpl.
-       cut (is_even 0 = true). intro Hev. rewrite Hev.
-       unfold Var.interp.
-       destruct wf_rho. simpl. unfold Lit.blit.
-       cut (0 >> 1 = 0). intros Heq0. rewrite Heq0. exact H.
-       now rewrite lsr_0_l.
-       apply is_even_0.
-Qed.
-
-Lemma bitOf_of_bits: forall l (a: BITVECTOR_LIST.bitvector (N.of_nat (length l))), 
-                               (forall i, 
-                               (i < (length l))%nat ->
-                               nth i l false = 
-                               (@BITVECTOR_LIST.bitOf (N.of_nat (length l)) i a))
-                               ->
-                               (BITVECTOR_LIST.bv_eq a (BITVECTOR_LIST.of_bits l)).
-Proof. intros l a H.
-       unfold BITVECTOR_LIST.of_bits in *.
-       unfold BITVECTOR_LIST.bitOf in *.
-       unfold BITVECTOR_LIST.bv_eq, BITVECTOR_LIST.bv in *.
-       unfold RAWBITVECTOR_LIST.bitOf in *.
-       destruct a.
-       unfold RAWBITVECTOR_LIST.of_bits.
-       unfold RAWBITVECTOR_LIST.bv_eq, RAWBITVECTOR_LIST.size, RAWBITVECTOR_LIST.bits in *.
-       rewrite wf0.       
-       rewrite N.eqb_compare.
-       rewrite N.compare_refl.
-       cut (Datatypes.length l = Datatypes.length bv). intro wf1.
-
-       apply (@nth_eq l bv wf1) in H.
-
-       rewrite H.
-       unfold RAWBITVECTOR_LIST.bv_eq, RAWBITVECTOR_LIST.size, RAWBITVECTOR_LIST.bits in *.
-       rewrite RAWBITVECTOR_LIST.List_eq_refl; auto.
-       apply inj_iff in wf0. now do 2 rewrite id' in wf0.
-
-Qed.
-
-Lemma valid_check_bbVar lres : C.valid rho (check_bbVar lres).
-Proof.
-      unfold check_bbVar.
-      case_eq (Lit.is_pos lres); intro Heq1; [ |now apply C.interp_true].
-      case_eq (t_form .[ Lit.blit lres]); try (intros; now apply C.interp_true).
-      intros a bs Heq0.
-      case_eq (check_bb a bs 0 (Datatypes.length bs)); intro Heq2; [ |now apply C.interp_true].
-      unfold C.valid. simpl. rewrite orb_false_r.
-      unfold Lit.interp. rewrite Heq1.
-      unfold Var.interp.
-      rewrite wf_interp_form; trivial. rewrite Heq0. simpl.
-      apply bitOf_of_bits. intros. 
-      cut (Lit.interp rho 1 = false). intro Hr. rewrite <- Hr. 
-      rewrite map_nth.
-      remember (@prop_checkbb' a bs Heq2 i).
-      rewrite map_length in H.
-      rewrite map_length.
-      clear Heqe.
-      now apply e in H.
-      now apply rho_1.
-Qed.
-
-Lemma check_bbc_length : forall bv bs, check_bbc bv bs = true -> length bv = length bs.
-Proof.
-  intro bv. induction bv.
-  intro bs. case bs.
-  simpl; trivial.
-  simpl; easy.
-  intro bs. case bs in *.
-  simpl; easy.
-  simpl.
-  case (Lit.is_pos i); try easy.
-  case (t_form .[ Lit.blit i]); try easy;
-  case a; try easy; intro Hc; apply IHbv in Hc; now rewrite Hc.
-Qed.
-
-Lemma nth_nil : forall A i (d:A), nth i [] d = d.
-Proof.
-  intros. unfold nth. case i; trivial.
-Qed.
 
 
 

@@ -811,7 +811,8 @@ Module Atom.
    | UO_BVzextn (n: nat) (i: nat)
    | UO_BVsextn (n: nat) (i: nat)
    | UO_BVneg   (_: nat)
-   | UO_BVnot   (_: nat).
+   | UO_BVnot   (_: nat)
+   | UO_BVbitOf (_: nat) (_: nat).
 (*
    | UO_BVbitOf (_: N) (_: nat)
 
@@ -883,6 +884,7 @@ Module Atom.
    | UO_BVsextn s1 i1, UO_BVsextn s2 i2 => Nat.eqb s1 s2 && Nat.eqb i1 i2
    | UO_BVneg s1, UO_BVneg s2 => Nat.eqb s1 s2
    | UO_BVnot s1, UO_BVnot s2 => Nat.eqb s1 s2
+   | UO_BVbitOf s1 n, UO_BVbitOf s2 m => Nat.eqb s1 s2 && Nat_eqb n m
 (*
    | UO_BVbitOf s1 n, UO_BVbitOf s2 m => Nat_eqb n m && N.eqb s1 s2
 
@@ -981,7 +983,7 @@ Module Atom.
 
   Lemma reflect_uop_eqb : forall o1 o2, reflect (o1 = o2) (uop_eqb o1 o2).
   Proof.
-    intros [ | | | | | | | | ] [ | | | | | | | | ]; simpl; try constructor;trivial; try discriminate.
+    intros [ | | | | | | | | | ] [ | | | | | | | | | ]; simpl; try constructor;trivial; try discriminate.
     intros. preflect (Nat.eqb_spec n n0). preflect (Nat.eqb_spec i i0).  rewrite Heq, Heq0.
     now constructor.
     intros. preflect (Nat.eqb_spec n n0). preflect (Nat.eqb_spec i i0).  rewrite Heq, Heq0.
@@ -990,7 +992,27 @@ Module Atom.
     now constructor.
     intros. preflect (Nat.eqb_spec n n0). rewrite Heq.
     now constructor.
+    intros. preflect (Nat.eqb_spec n n1). 
+            specialize (iff_reflect (UO_BVbitOf n n0 = UO_BVbitOf n1 n2)); intros.
+    specialize (H  (Nat_eqb n0 n2)).
+    apply H. split; intros. inversion H0. now rewrite Nat.eqb_refl.
+    apply Nat.eqb_eq in H0. now rewrite Heq, H0.
+Qed.
+
+(*    intros. preflect (Nat.eqb_spec s s0). 
+            specialize (iff_reflect (UO_BVbitOf s w n = UO_BVbitOf s0 w0 n0)); intros.
+    specialize (H  (RAWBITVECTOR_LIST.beq_list (wordToList w) (wordToList w0) && Nat_eqb n n0)).
+    apply H. split; intros. rewrite andb_true_iff. split.
+    inversion H0. dependent rewrite -> H3. now rewrite RAWBITVECTOR_LIST.List_eq.
+    inversion H0. now rewrite Nat.eqb_refl.
+    rewrite andb_true_iff in H0. destruct H0 as (Ha, Hb).
+    apply RAWBITVECTOR_LIST.List_eq in Ha. subst. rewrite wordToList_inj in Ha.
+    apply Nat.eqb_eq in Hb.
+    now rewrite Ha, Hb.
+
   Qed.
+*)
+
 
 (*
   Proof.
@@ -1201,8 +1223,9 @@ Qed.
         | UO_BVsextn s i => (Typ.TWord s, Typ.TWord (i + s))
         | UO_BVneg s => (Typ.TWord s, Typ.TWord s)
         | UO_BVnot s => (Typ.TWord s, Typ.TWord s)
+        | UO_BVbitOf s n => (Typ.TWord s, Typ.Tbool)
 (*
-        | UO_BVbitOf s _ => (Typ.TBV s, Typ.Tbool)
+
 
 
         | UO_BVextr i n0 n1 => (Typ.TBV n1, Typ.TBV n0)
@@ -1622,8 +1645,9 @@ Qed.
           apply_unop (Typ.TWord s) (Typ.TWord (s + i)) (fun w => @sext s w i)
         | UO_BVneg s => apply_unop (Typ.TWord s) (Typ.TWord s) (@wneg s)
         | UO_BVnot s => apply_unop (Typ.TWord s) (Typ.TWord s) (@wnot s)
+        | UO_BVbitOf s n => apply_unop (Typ.TWord s) Typ.Tbool (fun w => @wbitOf s w n)
 (*
-        | UO_BVbitOf s n => apply_unop (Typ.TBV s) Typ.Tbool (BITVECTOR_LIST.bitOf n)
+
 
 
         | UO_BVextr i n0 n1 => 
