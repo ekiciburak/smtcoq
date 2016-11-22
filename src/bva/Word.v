@@ -1400,6 +1400,55 @@ Proof. intros s x.
          rewrite !rev_length. now rewrite !len_wordToList.
 Qed.
 
+  Lemma wtl_eq: forall sz (x y: word sz), wordToList x = wordToList y -> x = y.
+  Proof. intros sz x.
+         induction x; intros.
+         - specialize (WOz y); intros; now subst.
+         - rewrite (shatter_word y) in *.
+           simpl in *. case_eq b; case_eq (whd y); intros; rewrite H0, H1 in H.
+           inversion H. apply f_equal. now apply IHx.
+           now contradict H.
+           now contradict H.
+           inversion H. apply f_equal. now apply IHx.
+  Qed.
+
+  Lemma weqb_refl: forall sz (x: word sz), weqb x x = true.
+  Proof. intros sz x.
+         induction x; intros; try now simpl.
+         - simpl. now rewrite Bool.eqb_reflx, IHx.
+  Qed.
+
+  Lemma hlp7: forall a b, (S a <? S b) = true <-> (a <? b) = true.
+  Proof. intro a.
+         induction a as [ | xa IHa ]; split; intros.
+         - case_eq b; intros. subst. now contradict H. easy.
+         - case_eq b; intros. subst. now contradict H.
+           unfold Nat.ltb in *. simpl. case_eq n; intros.
+           subst. easy. easy.
+         - unfold Nat.ltb in *. case_eq b; intros.
+           subst. now contradict H.
+           subst. inversion H. case_eq n; intros.
+           easy. subst. rewrite H1. now simpl.
+         - unfold Nat.ltb in *. case_eq b; intros.
+           subst. now contradict H.
+           subst. inversion H. case_eq n; intros.
+           easy. subst. rewrite H1. now simpl.
+  Qed.
+
+  Lemma nat_ltb_trans: forall a b c, a <? b = true -> b <? c = true -> a <? c = true.
+  Proof. intro a.
+         induction a as [ | xa IHa ]; intros.
+         - case_eq b; case_eq c; intros. subst. easy.
+           easy. subst. now contradict H0. easy.
+         - case_eq b; case_eq c; intros.
+           subst. now contradict H0.
+           subst. now contradict H.
+           subst. now contradict H0.
+           apply hlp7. specialize (@IHa n0 n). apply IHa.
+           subst. now rewrite hlp7 in H.
+           subst. now rewrite hlp7 in H0.
+  Qed.
+
 (** *)
 
 Notation "w1 > w2" := (@wlt _ w2%word w1%word) : word_scope.

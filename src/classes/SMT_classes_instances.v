@@ -212,10 +212,12 @@ Section BV.
     exists (fun a b => (Word.wltbNat a b)).
     unfold wltbNat.
     intros x y z; destruct x, y, z; try easy.
-    intros. contradict H0. admit. intros. admit.
-    intros. admit.
-
-Admitted.
+    intros. apply (nat_ltb_trans (wordToNat WO) ( wordToNat (WS b y)) (wordToNat (WS b0 z))); easy.
+    intros. apply (nat_ltb_trans (wordToNat (WS b x)) ( wordToNat (WS b0 y)) (wordToNat (WS b1 z))); easy.
+    intros. rewrite wltbNat_true_iff in H.
+    apply RAWBITVECTOR_LIST.ult_list_not_eq in H.
+    unfold not in *. intros. apply H. now rewrite H0.
+  Defined.
 
   Instance BV_eqbtype n : EqbType (bitvector n) :=
     {| eqb := @bv_eq n;
@@ -273,8 +275,23 @@ Admitted.
   Instance Word_comp n: Comparable (word n).
   Proof.
     constructor.
-    intros x y. admit.
-  Admitted.
+    intros x y.
+    case_eq (wltbNat x y); intros.
+    apply OrderedType.LT.
+    unfold wltbNat in *. auto.
+    case_eq (weqb x y); intros.
+    apply OrderedType.EQ.
+    now apply weqb_true_iff.
+    apply OrderedType.GT.
+    unfold wltbNat in *. auto. unfold lt. simpl.
+    apply Nat.ltb_ge in H.
+    inversion H. apply wordToList_eq2 in H2.
+    apply wtl_eq in H2. rewrite H2 in H0. rewrite weqb_refl in H0.
+    now contradict H0.
+    assert ((wordToNat y) <? (wordToNat x)). 
+     { rewrite <- H1. apply Nat.leb_le in H2. easy. }
+    unfold wltbNat. easy.
+  Defined.
 
   Instance BV_inh n : Inhabited (bitvector n) :=
     {| default_value := zeros n |}.
