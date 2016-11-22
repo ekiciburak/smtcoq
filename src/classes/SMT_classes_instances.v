@@ -209,14 +209,12 @@ Section BV.
 
   Instance Word_ord n : OrdType (word n).
   Proof.
-    exists (fun a b => (wltb a b)).
-    unfold wltb.
+    exists (fun a b => (Word.wltbNat a b)).
+    unfold wltbNat.
     intros x y z; destruct x, y, z; try easy.
     intros. contradict H0. admit. intros. admit.
     intros. admit.
-    admit. admit.
 
-    intros. admit.
 Admitted.
 
   Instance BV_eqbtype n : EqbType (bitvector n) :=

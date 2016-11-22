@@ -1,7 +1,7 @@
 (** Fixed precision machine words *)
 Add Rec LoadPath "." as SMTCoq.
 
-Require Import Arith Div2 NArith Bool Omega List.
+Require Import Arith Div2 NArith Bool Omega List BVList.
 Require Import Nomega.
 
 Local Open Scope list_scope.
@@ -1129,11 +1129,342 @@ Definition wslt sz (l r : word sz) : Prop :=
 
 (** *)
 
-Definition wltb sz (l r : word sz) : bool :=
-  N.ltb (wordToN l) (wordToN r).
+Lemma WOz: forall (a: word 0), a = WO.
+Proof. now simpl. Qed.
 
-Definition wsltb sz (l r : word sz) : bool :=
-  Z.ltb (wordToZ l) (wordToZ r).
+Definition wltbNat sz (l r : word sz) : bool :=
+  Nat.ltb (wordToNat l) (wordToNat r).
+
+Definition wltNat sz (l r : word sz) : Prop :=
+ if wltbNat l r then True else False.
+
+Definition wltNat2 sz (l r : word sz) : Prop :=
+  Nat.lt (wordToNat l) (wordToNat r).
+
+
+Lemma wltNat_true_iff: forall s (x y: word s), wltNat x y <-> wltNat2 x y.
+Proof. intros s x.
+       induction x; intros.
+       - specialize (WOz y); intros.
+         rewrite H. now compute.
+       - rewrite (shatter_word y) in *. split; intros.
+         unfold wltNat, wltNat2 in *. simpl.
+         case_eq b; case_eq (whd y); intros; rewrite H0, H1 in H.
+         case_eq (wltbNat x~1 (wtl y)~1 ); intros.
+         unfold wltbNat in H2. simpl in H2.
+         apply Nat.ltb_lt in H2. easy.
+         rewrite H2 in H. now contradict H.
+         case_eq (wltbNat x~1 (wtl y)~0); intros.
+         apply Nat.ltb_lt in H2. easy.
+         rewrite H2 in H. now contradict H.
+         case_eq (wltbNat x~0 (wtl y)~1); intros.
+         apply Nat.ltb_lt in H2. easy.
+         rewrite H2 in H. now contradict H.
+         case_eq (wltbNat x~0 (wtl y)~0); intros.
+         apply Nat.ltb_lt in H2. easy.
+         rewrite H2 in H. now contradict H.
+
+         rewrite (shatter_word y) in *.
+         unfold wltNat, wltNat2 in *. simpl in *.
+         case_eq b; case_eq (whd y); intros; rewrite H0, H1 in H;
+         apply Nat.ltb_lt in H; unfold wltbNat; simpl;
+         now rewrite H.
+Qed.
+
+Require Import Psatz.
+
+Lemma wordToNatS_eq1: forall n m, 
+(S n <? S m) = (n <? m).
+Proof. auto. Qed.
+
+Lemma hlp: forall n, (2 <? n * 2) = (1 <? n).
+Proof. intro n. 
+       induction n as [ | xn IHn ]; intros.
+       - now simpl.
+       - simpl. unfold Nat.ltb. simpl. case_eq xn; intros; now simpl.
+Qed.
+
+Lemma hlp2: forall n m, (n * 2 <=? S (m * 2)) = (n <=? m).
+Proof. intro n.
+       induction n as [ | xn IHn ]; intros.
+       - now simpl.
+       - simpl. case_eq m; intros.
+         + now simpl. 
+         + simpl. now rewrite IHn.
+Qed.
+
+
+Lemma wordToNatt_eq1: forall s (x y: word s), 
+(((wordToNat x) * 2) <? ((wordToNat y) * 2)) = ((wordToNat x) <? (wordToNat y)).
+Proof. intros s x.
+       induction (wordToNat x); intros.  simpl.
+       - case_eq (wordToNat y); intros. now simpl.
+         simpl. auto.
+       - simpl. case_eq n; intros. simpl. now rewrite hlp.
+         simpl. unfold Nat.ltb. simpl.
+         
+         case_eq (wordToNat y); intros; try now simpl.
+         case_eq n1; intros; simpl. easy.
+         case_eq n2; intros; simpl. easy.
+         now rewrite hlp2.
+Qed. 
+
+
+Lemma wordToNat_eq1: forall s (x y: word s), 
+(S (wordToNat x * 2) <? S (wordToNat y * 2)) = ((wordToNat x) <? (wordToNat y)).
+Proof. intros. simpl.
+       now rewrite wordToNatS_eq1, wordToNatt_eq1.
+Qed.
+
+Lemma wordToNat_eq2: forall n m, 
+(S (n * 2) <? (m * 2)) = (n <? m).
+Proof. intro n.
+       induction n as [ | xn IHn ]; intros.
+       - simpl. case_eq m; intros.
+         simpl. easy. simpl. easy.
+       - simpl. unfold Nat.ltb. simpl.
+         case_eq m; intros; try now simpl.
+         case_eq n; intros; try now simpl.
+         simpl. unfold Nat.ltb in IHn.
+         specialize (IHn (S n0)). simpl in IHn.
+         now rewrite IHn.
+Qed.
+
+Lemma hlp3: forall n, (n * 2 <=? 0) = (n <=? 0).
+Proof. induction n as [ | xn IHn ]; intros; now simpl. Qed.
+
+
+Lemma wordToNat_eq3: forall n m, 
+((n * 2) <? (S (m * 2))) = (n <=? m).
+Proof. intro n.
+       induction n as [ | xn IHn ]; intros.
+       - simpl. case_eq m; intros.
+         simpl. easy. simpl. easy.
+       - simpl. unfold Nat.ltb. simpl.
+         case_eq m; intros; try now simpl.
+         case_eq n; intros; try now simpl.
+         simpl. now rewrite hlp3.
+         simpl. unfold Nat.ltb in IHn.
+         specialize (IHn (S n0)). simpl in IHn.
+         now rewrite IHn.
+Qed.
+
+Lemma wordToNat_eq4: forall s (x y: word s), 
+((wordToNat x * 2) <=? (wordToNat y * 2)) = ((wordToNat x) <=? (wordToNat y)).
+Proof. intros. simpl.
+Admitted.
+
+
+Lemma wordToNat_eq5: forall x y, 
+(S ( x * 2) <? y) = (x <? y).
+Proof.
+Admitted.
+
+
+
+Lemma ult_eqtt: forall a b,
+length a = length b ->
+RAWBITVECTOR_LIST.ult_list_big_endian a b =
+RAWBITVECTOR_LIST.ult_list_big_endian (a ++ [true]) (b ++ [true]).
+Admitted.
+
+Lemma ult_eqtf: forall a b,
+length a = length b ->
+RAWBITVECTOR_LIST.ult_list_big_endian a b =
+RAWBITVECTOR_LIST.ult_list_big_endian (a ++ [true]) (b ++ [false]).
+Admitted.
+
+(*
+Lemma ult_eqft1: forall s (x y: word s), 
+((wordToNat x) <? wordToNat y) =
+RAWBITVECTOR_LIST.ult_list_big_endian (rev (true :: wordToList x) ++ [false])
+  (rev (false :: wordToList y) ++ [true]).
+Proof. intros s x.
+       induction x; intros.
+       - specialize (WOz y); intros.
+         rewrite H. now compute.
+       - simpl. case_eq b; intros. simpl.
+         rewrite wordToNat_eq5. rewrite IHx.
+
+ intros. simpl. rewrite !app_assoc_reverse. simpl.
+Admitted.
+
+Lemma ult_eqft: forall s (x y: word s), 
+(wordToNat x <=? wordToNat y) =
+RAWBITVECTOR_LIST.ult_list_big_endian (rev (wordToList x) ++ [false]) (rev (wordToList y) ++ [true]).
+Proof. intros s x.
+       induction x; intros.
+       - specialize (WOz y); intros.
+         rewrite H. now compute.
+       - rewrite (shatter_word y) in *.
+         unfold wltbNat. simpl.
+         case_eq b; case_eq (whd y); intros. simpl.
+         rewrite wordToNat_eq4. rewrite IHx.
+         rewrite !app_assoc_reverse. simpl. admit.
+         admit.
+         
+
+         specialize (IHx (wtl y)).
+         simpl. case_eq (wordToNat (wtl y) * 2); intros.
+         rewrite !app_assoc_reverse. simpl. admit.
+         
+
+
+ admit.
+         
+*)
+
+Lemma times2_eq: forall x y, x * 2 = y * 2 <-> x = y.
+Proof. intro x.
+       induction x as [ | xs IHx ]; intros.
+       - simpl. lia.
+       - simpl; split; intros; lia.
+Qed.
+
+
+Lemma wordToList_eq: forall sz (x y: word sz),
+wordToList x = wordToList y -> wordToNat x = wordToNat y.
+Proof. intros sz x.
+       induction x; intros.
+       - specialize (WOz y); intros. rewrite H0. now simpl.
+       - simpl in *. rewrite (shatter_word y) in *.
+         simpl. case_eq b; case_eq (whd y); intros.
+         rewrite H0, H1 in H. inversion H. apply IHx in H3.
+         rewrite H3. lia.
+         rewrite H0, H1 in H. now contradict H.
+         rewrite H0, H1 in H. now contradict H.
+         rewrite H0, H1 in H. inversion H. apply IHx in H3.
+         rewrite H3. lia.
+Qed.
+
+
+Lemma wordToNat_f: forall x y, S (x * 2) = y * 2 -> False.
+Proof. intros. lia. Qed.
+
+Lemma wordToNat_f2: forall x y, (x * 2) = S (y * 2) -> False.
+Proof. intros. lia. Qed.
+
+
+Lemma wordToList_eq2: forall sz (x y: word sz),
+wordToNat x = wordToNat y -> wordToList x = wordToList y.
+Proof. intros sz x.
+       induction x; intros.
+       - specialize (WOz y); intros. rewrite H0. now simpl.
+       - simpl in *. rewrite (shatter_word y) in *.
+         simpl. case_eq b; case_eq (whd y); intros.
+         rewrite H0, H1 in H. apply f_equal.
+         apply IHx. inversion H. lia.
+         rewrite H0, H1 in H. simpl in H. apply wordToNat_f in H.
+         now contradict H.
+         rewrite H0, H1 in H. simpl in H. apply wordToNat_f2 in H.
+         now contradict H.
+         rewrite H0, H1 in H. apply f_equal. apply IHx.
+         simpl in H. lia.
+Qed.
+
+Lemma hlp4: forall x y, (S x <=? y) = true -> (x <=? y) = true.
+Proof. intros. apply Nat.ltb_lt in H. apply Nat.leb_le. lia. Qed.
+
+Lemma ult_eqft_w: forall a b,
+length a = length b ->
+RAWBITVECTOR_LIST.ult_list_big_endian a b = true ->
+RAWBITVECTOR_LIST.ult_list_big_endian (a ++ [false]) (b ++ [true]) = true.
+Admitted.
+
+
+Lemma hlp5: forall x y, (S y <=? x) = true -> (S x <=? y) = false.
+Proof. intro x.
+       induction x as [ | xs IHx ]; intros.
+       - simpl in *. now contradict H.
+       - simpl in *. case_eq y; intros; try easy.
+         + simpl. case_eq xs; intros.
+           subst.  now contradict H.
+           specialize (IHx n). rewrite H1 in IHx.
+           case_eq n; intros. easy. rewrite H2 in IHx.
+           apply IHx. subst. now inversion H.
+Qed.
+
+Lemma hlp6: forall x y, (S y <=? x) = true -> (x <=? y) = false.
+Proof. intro x.
+       induction x as [ | xs IHx ]; intros.
+       - simpl in *. now contradict H.
+       - simpl in *. case_eq y; intros; try easy.
+         + simpl. case_eq xs; intros.
+           subst.  now contradict H.
+           specialize (IHx n). rewrite H1 in IHx.
+           case_eq n; intros. easy. rewrite H2 in IHx.
+           apply IHx. subst. now inversion H.
+Qed.
+
+Lemma ult_eqff: forall a b,
+length a = length b ->
+RAWBITVECTOR_LIST.ult_list_big_endian a b = 
+RAWBITVECTOR_LIST.ult_list_big_endian (a ++ [false]) (b ++ [false]).
+Admitted.
+
+Lemma ult_eqft_f: forall a b,
+length a = length b ->
+RAWBITVECTOR_LIST.beq_list a b = false ->
+RAWBITVECTOR_LIST.ult_list_big_endian a b = false ->
+RAWBITVECTOR_LIST.ult_list_big_endian (a ++ [false]) (b ++ [true]) = false.
+Admitted.
+
+
+Lemma wltbNat_true_iff: forall s (x y: word s), 
+      wltbNat x y = RAWBITVECTOR_LIST.ult_list (wordToList x) (wordToList y).
+Proof. intros s x.
+       induction x; intros.
+       - specialize (WOz y); intros.
+         rewrite H. now compute.
+       - rewrite (shatter_word y) in *.
+         unfold wltbNat. simpl.
+         case_eq b; case_eq (whd y); intros.
+         unfold RAWBITVECTOR_LIST.ult_list. simpl.
+         rewrite wordToNat_eq1. unfold wltbNat in IHx. rewrite IHx.
+         unfold RAWBITVECTOR_LIST.ult_list.
+         rewrite ult_eqtt. reflexivity.
+         now rewrite !rev_length, !len_wordToList.
+
+         unfold RAWBITVECTOR_LIST.ult_list. simpl.
+         rewrite wordToNat_eq2. unfold wltbNat in IHx. rewrite IHx.
+         unfold RAWBITVECTOR_LIST.ult_list.
+         rewrite ult_eqtf. reflexivity.
+         now rewrite !rev_length, !len_wordToList.
+
+         unfold RAWBITVECTOR_LIST.ult_list. simpl.
+         rewrite wordToNat_eq3. unfold wltbNat, Nat.ltb in IHx.
+         destruct (Nat.compare_spec (wordToNat x) (wordToNat (wtl y))).
+         rewrite H1. simpl. apply wordToList_eq2 in H1.
+         rewrite H1. specialize (IHx (wtl y)).
+         rewrite Nat.leb_refl. admit.
+         specialize (IHx (wtl y)).
+         apply Nat.ltb_lt in H1.
+         unfold Nat.ltb in H1. rewrite H1 in IHx.
+         apply hlp4 in H1. rewrite H1, IHx at 1.
+         unfold RAWBITVECTOR_LIST.ult_list. simpl.
+
+
+         rewrite ult_eqft_w at 1. now unfold RAWBITVECTOR_LIST.ult_list in *.
+         rewrite !rev_length. now rewrite !len_wordToList.
+         now unfold RAWBITVECTOR_LIST.ult_list in *.
+         specialize (IHx (wtl y)).
+         apply Nat.ltb_lt in H1.
+         unfold Nat.ltb in H1. pose proof H1 as H1p.
+         apply hlp5 in H1. rewrite H1 in IHx.
+         apply hlp6 in H1p. rewrite H1p.
+         
+         unfold RAWBITVECTOR_LIST.ult_list. simpl.
+         rewrite ult_eqft_f. easy.
+         rewrite !rev_length. now rewrite !len_wordToList.
+         admit.
+         now unfold RAWBITVECTOR_LIST.ult_list in *.
+         
+         unfold RAWBITVECTOR_LIST.ult_list. simpl.
+         specialize (IHx (wtl y)). unfold wltbNat in *.
+         rewrite wordToNatt_eq1, IHx, <- ult_eqff at 1.
+         now unfold RAWBITVECTOR_LIST.ult_list.
+         rewrite !rev_length. now rewrite !len_wordToList.
+Admitted.
 
 (** *)
 
