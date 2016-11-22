@@ -7276,160 +7276,12 @@ Proof.
 Qed.
 
 
-
-(** incorporated down here *)
-
-
-(*
-
-
-Let a : list bool := [true; false; true; false; true; true; true; true].
-Let b : list bool := [true; true; false; true; true; false; true; true].
-
-Let c : list bool := [false; true; false; true; false; true; false; true; true; false; false; false ;true; false; false ].
-Let d : list bool := [true; true; false; false; false; true; true; true; false; false ;true; false; true; false; true ].
-Let n := (length b)%nat.
-Let n1 := (n - 1)%nat.
-Let m: Z := Z.of_nat(length a).
-Let k := (length d)%nat.
-
-Compute
-    Word.wltb (ListToword a (length a)) (ListToword b (length a))
-    = 
-    RAWBITVECTOR_LIST.ult_list a b. 
-
-Compute
-(posToWord (Datatypes.length a) 100)~1 = posToWord (S (Datatypes.length a)) (Pos.pred_double 100).
-
-Compute
-natToWord (Datatypes.length a)
-  (Natpow2 (Datatypes.length a) - wordToNat (ListToword a (Datatypes.length a)) - 1) =
-ListToword (map negb a) (Datatypes.length a).
-
-Compute
-wnegNat (ListToword a (length a)) = ListToword (RAWBITVECTOR_LIST.twos_complement a) (length a).
-
-Compute
-Word.wneg (ListToword a (length a)) = ListToword (RAWBITVECTOR_LIST.twos_complement a) (length a).
-
-Compute
-RAWBITVECTOR_LIST.ult_list_big_endian (rev a) (rev b) =
-RAWBITVECTOR_LIST.ult_list_big_endian ((rev a) ++ c) ((rev b) ++ c).
-
-Compute
-(wordToN (ListToword a n) <?
- wordToN (ListToword b n))%N = RAWBITVECTOR_LIST.ult_list_big_endian (rev a) (rev b).
-
-Compute
-RAWBITVECTOR_LIST.ult_list_big_endian (rev (true :: a)) (rev (true :: b)) =
-RAWBITVECTOR_LIST.ult_list_big_endian (rev a) (rev b).
-
-Compute
-RAWBITVECTOR_LIST.ult_list_big_endian (rev (true :: true :: a)) (rev (true :: true :: b)) =
-RAWBITVECTOR_LIST.ult_list_big_endian (rev a) (rev b).
-
-Compute
-RAWBITVECTOR_LIST.mult_bool_step_k_h a (false :: a) true 0 =
-RAWBITVECTOR_LIST.mult_bool_step_k_h a (false :: removelast a) true 0.
-
-Compute
-(RAWBITVECTOR_LIST.add_list_ingr a a false) = false :: (removelast a).
-
-Compute
-RAWBITVECTOR_LIST.mult_bool_step_k_h a (false :: a) false 0 =
-RAWBITVECTOR_LIST.mult_bool_step_k_h a (RAWBITVECTOR_LIST.mult_bool_step_k_h a a false 0) false 0.
-
-
-
-Compute
-RAWBITVECTOR_LIST.mult_bool_step (true :: a) (true :: b)
-  (true :: RAWBITVECTOR_LIST.add_list_ingr a (true :: a) false) 2
-  (Datatypes.length a) =
-RAWBITVECTOR_LIST.mult_bool_step (true :: a) (true :: b) (true :: a) 1
-  (Datatypes.length a).
-
-
-Compute
-           (RAWBITVECTOR_LIST.mult_bool_step a b a 1
-              (Datatypes.length a)) =
-           (RAWBITVECTOR_LIST.mult_bool_step a b (RAWBITVECTOR_LIST.mk_list_false (length a)) 0
-              (Datatypes.length a)).
-
-
-Compute
-RAWBITVECTOR_LIST.mult_bool_step (true :: true :: a) (true :: b)
-  (true :: false :: RAWBITVECTOR_LIST.add_list_ingr a (true :: a) true) 2
-  (Datatypes.length a) =
-true
-:: RAWBITVECTOR_LIST.add_list b
-     (RAWBITVECTOR_LIST.mult_bool_step (true :: a) (true :: b) (true :: a) 1
-        (Datatypes.length a)).
-
-Compute
-RAWBITVECTOR_LIST.mult_bool_step_k_h a
-                 (true :: a) true 0  = 
-RAWBITVECTOR_LIST.add_list_ingr a
-                 (true :: a) true.
-
-
-Compute
-RAWBITVECTOR_LIST.mult_bool_step (true :: true :: a) (false :: b)
-  (false :: true :: match a with
-                    | [] => []
-                    | _ :: _ => true :: removelast a
-                    end) 2 (Datatypes.length a) =
-false
-:: RAWBITVECTOR_LIST.add_list b
-     (RAWBITVECTOR_LIST.mult_bool_step (true :: a) (false :: b)
-        (false :: RAWBITVECTOR_LIST.mk_list_false (Datatypes.length a)) 1
-        (Datatypes.length a)).
-
-Compute
-RAWBITVECTOR_LIST.mult_bool_step_k_h (RAWBITVECTOR_LIST.mk_list_false (Datatypes.length a))
-  (false :: a) false 0 = removelast (false :: a).
-
-Compute
-RAWBITVECTOR_LIST.add_list_ingr (RAWBITVECTOR_LIST.mk_list_false (Datatypes.length a))
-  (false :: a) false = removelast (false :: a).
-
-Compute
-RAWBITVECTOR_LIST.mult_bool_step_k_h
-           (RAWBITVECTOR_LIST.mk_list_false (Datatypes.length a)) 
-           (true :: a) false 0 =
-RAWBITVECTOR_LIST.add_list_ingr
-           (RAWBITVECTOR_LIST.mk_list_false (Datatypes.length a)) 
-           (true :: a) false.
-
-Compute
-RAWBITVECTOR_LIST.mult_bool_step (true :: a) (false :: b)
-  (false :: RAWBITVECTOR_LIST.mk_list_false (Datatypes.length a)) 1 (Datatypes.length a) =
-false :: RAWBITVECTOR_LIST.add_list b (RAWBITVECTOR_LIST.mult_list_carry a (false :: b) (Datatypes.length a)).
-
-
-Let n2 := ((listTonat a + listTonat a + (listTonat b + listTonat b) * S (listTonat a + listTonat a)) - 1)%nat.
-
-Compute n2.
-
-Eval simpl in RAWBITVECTOR_LIST.mult_bool_step (true :: b) (true :: a)
-  (true :: RAWBITVECTOR_LIST.and_with_bool b true) 1 n1 =
-mod2 n2 :: natTolist (S n1) (S (Nat.div2 n2)).
-
-Compute Word.wmult (ListToword a n) (ListToword b n) = 
-ListToword (RAWBITVECTOR_LIST.bvmult_bool a b n) n.
-*)
-
-Compute wordToN (WS true (WS false WO)).
-
-Lemma wltbNat_true_iff_w: forall s (x y: word s), 
-      wltbNat x y = RAWBITVECTOR_LIST.ult_list (wordToList x) (wordToList y).
-Admitted.
-
 Lemma prop_check_ult: forall a b, 
   length a = length b ->
     Word.wltbNat (ListToword a (length a)) (ListToword b (length a))
     = 
     RAWBITVECTOR_LIST.ult_list a b. 
-Proof. intros. rewrite wltbNat_true_iff_w. rewrite W2L_involutive.
+Proof. intros. rewrite wltbNat_true_iff. rewrite W2L_involutive.
        rewrite H, W2L_involutive. reflexivity. easy. easy.
 Qed.
 
@@ -7789,6 +7641,149 @@ Proof.
         contradict Heq16.
         unfold check_ult. rewrite H8. easy.
 Qed.
+
+
+(** incorporated down here *)
+
+
+(*
+
+
+Let a : list bool := [true; false; true; false; true; true; true; true].
+Let b : list bool := [true; true; false; true; true; false; true; true].
+
+Let c : list bool := [false; true; false; true; false; true; false; true; true; false; false; false ;true; false; false ].
+Let d : list bool := [true; true; false; false; false; true; true; true; false; false ;true; false; true; false; true ].
+Let n := (length b)%nat.
+Let n1 := (n - 1)%nat.
+Let m: Z := Z.of_nat(length a).
+Let k := (length d)%nat.
+
+Compute
+    Word.wltb (ListToword a (length a)) (ListToword b (length a))
+    = 
+    RAWBITVECTOR_LIST.ult_list a b. 
+
+Compute
+(posToWord (Datatypes.length a) 100)~1 = posToWord (S (Datatypes.length a)) (Pos.pred_double 100).
+
+Compute
+natToWord (Datatypes.length a)
+  (Natpow2 (Datatypes.length a) - wordToNat (ListToword a (Datatypes.length a)) - 1) =
+ListToword (map negb a) (Datatypes.length a).
+
+Compute
+wnegNat (ListToword a (length a)) = ListToword (RAWBITVECTOR_LIST.twos_complement a) (length a).
+
+Compute
+Word.wneg (ListToword a (length a)) = ListToword (RAWBITVECTOR_LIST.twos_complement a) (length a).
+
+Compute
+RAWBITVECTOR_LIST.ult_list_big_endian (rev a) (rev b) =
+RAWBITVECTOR_LIST.ult_list_big_endian ((rev a) ++ c) ((rev b) ++ c).
+
+Compute
+(wordToN (ListToword a n) <?
+ wordToN (ListToword b n))%N = RAWBITVECTOR_LIST.ult_list_big_endian (rev a) (rev b).
+
+Compute
+RAWBITVECTOR_LIST.ult_list_big_endian (rev (true :: a)) (rev (true :: b)) =
+RAWBITVECTOR_LIST.ult_list_big_endian (rev a) (rev b).
+
+Compute
+RAWBITVECTOR_LIST.ult_list_big_endian (rev (true :: true :: a)) (rev (true :: true :: b)) =
+RAWBITVECTOR_LIST.ult_list_big_endian (rev a) (rev b).
+
+Compute
+RAWBITVECTOR_LIST.mult_bool_step_k_h a (false :: a) true 0 =
+RAWBITVECTOR_LIST.mult_bool_step_k_h a (false :: removelast a) true 0.
+
+Compute
+(RAWBITVECTOR_LIST.add_list_ingr a a false) = false :: (removelast a).
+
+Compute
+RAWBITVECTOR_LIST.mult_bool_step_k_h a (false :: a) false 0 =
+RAWBITVECTOR_LIST.mult_bool_step_k_h a (RAWBITVECTOR_LIST.mult_bool_step_k_h a a false 0) false 0.
+
+
+
+Compute
+RAWBITVECTOR_LIST.mult_bool_step (true :: a) (true :: b)
+  (true :: RAWBITVECTOR_LIST.add_list_ingr a (true :: a) false) 2
+  (Datatypes.length a) =
+RAWBITVECTOR_LIST.mult_bool_step (true :: a) (true :: b) (true :: a) 1
+  (Datatypes.length a).
+
+
+Compute
+           (RAWBITVECTOR_LIST.mult_bool_step a b a 1
+              (Datatypes.length a)) =
+           (RAWBITVECTOR_LIST.mult_bool_step a b (RAWBITVECTOR_LIST.mk_list_false (length a)) 0
+              (Datatypes.length a)).
+
+
+Compute
+RAWBITVECTOR_LIST.mult_bool_step (true :: true :: a) (true :: b)
+  (true :: false :: RAWBITVECTOR_LIST.add_list_ingr a (true :: a) true) 2
+  (Datatypes.length a) =
+true
+:: RAWBITVECTOR_LIST.add_list b
+     (RAWBITVECTOR_LIST.mult_bool_step (true :: a) (true :: b) (true :: a) 1
+        (Datatypes.length a)).
+
+Compute
+RAWBITVECTOR_LIST.mult_bool_step_k_h a
+                 (true :: a) true 0  = 
+RAWBITVECTOR_LIST.add_list_ingr a
+                 (true :: a) true.
+
+
+Compute
+RAWBITVECTOR_LIST.mult_bool_step (true :: true :: a) (false :: b)
+  (false :: true :: match a with
+                    | [] => []
+                    | _ :: _ => true :: removelast a
+                    end) 2 (Datatypes.length a) =
+false
+:: RAWBITVECTOR_LIST.add_list b
+     (RAWBITVECTOR_LIST.mult_bool_step (true :: a) (false :: b)
+        (false :: RAWBITVECTOR_LIST.mk_list_false (Datatypes.length a)) 1
+        (Datatypes.length a)).
+
+Compute
+RAWBITVECTOR_LIST.mult_bool_step_k_h (RAWBITVECTOR_LIST.mk_list_false (Datatypes.length a))
+  (false :: a) false 0 = removelast (false :: a).
+
+Compute
+RAWBITVECTOR_LIST.add_list_ingr (RAWBITVECTOR_LIST.mk_list_false (Datatypes.length a))
+  (false :: a) false = removelast (false :: a).
+
+Compute
+RAWBITVECTOR_LIST.mult_bool_step_k_h
+           (RAWBITVECTOR_LIST.mk_list_false (Datatypes.length a)) 
+           (true :: a) false 0 =
+RAWBITVECTOR_LIST.add_list_ingr
+           (RAWBITVECTOR_LIST.mk_list_false (Datatypes.length a)) 
+           (true :: a) false.
+
+Compute
+RAWBITVECTOR_LIST.mult_bool_step (true :: a) (false :: b)
+  (false :: RAWBITVECTOR_LIST.mk_list_false (Datatypes.length a)) 1 (Datatypes.length a) =
+false :: RAWBITVECTOR_LIST.add_list b (RAWBITVECTOR_LIST.mult_list_carry a (false :: b) (Datatypes.length a)).
+
+
+Let n2 := ((listTonat a + listTonat a + (listTonat b + listTonat b) * S (listTonat a + listTonat a)) - 1)%nat.
+
+Compute n2.
+
+Eval simpl in RAWBITVECTOR_LIST.mult_bool_step (true :: b) (true :: a)
+  (true :: RAWBITVECTOR_LIST.and_with_bool b true) 1 n1 =
+mod2 n2 :: natTolist (S n1) (S (Nat.div2 n2)).
+
+Compute Word.wmult (ListToword a n) (ListToword b n) = 
+ListToword (RAWBITVECTOR_LIST.bvmult_bool a b n) n.
+*)
+
 
 
 (** BV MULTIPLICATION CHECKER WORDS*)

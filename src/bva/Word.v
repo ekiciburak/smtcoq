@@ -1249,70 +1249,18 @@ Proof. intro n.
          now rewrite IHn.
 Qed.
 
+Lemma Nat_eq4: forall a b, ((a * 2) <=? (b * 2)) = (a <=? b).
+Proof. intro a.
+       induction a as [ | xa IHa ]; intros.
+       - now simpl.
+       - simpl. case_eq b; intros.
+         now simpl.
+         simpl. now rewrite IHa.
+Qed. 
+
 Lemma wordToNat_eq4: forall s (x y: word s), 
 ((wordToNat x * 2) <=? (wordToNat y * 2)) = ((wordToNat x) <=? (wordToNat y)).
-Proof. intros. simpl.
-Admitted.
-
-
-Lemma wordToNat_eq5: forall x y, 
-(S ( x * 2) <? y) = (x <? y).
-Proof.
-Admitted.
-
-
-
-Lemma ult_eqtt: forall a b,
-length a = length b ->
-RAWBITVECTOR_LIST.ult_list_big_endian a b =
-RAWBITVECTOR_LIST.ult_list_big_endian (a ++ [true]) (b ++ [true]).
-Admitted.
-
-Lemma ult_eqtf: forall a b,
-length a = length b ->
-RAWBITVECTOR_LIST.ult_list_big_endian a b =
-RAWBITVECTOR_LIST.ult_list_big_endian (a ++ [true]) (b ++ [false]).
-Admitted.
-
-(*
-Lemma ult_eqft1: forall s (x y: word s), 
-((wordToNat x) <? wordToNat y) =
-RAWBITVECTOR_LIST.ult_list_big_endian (rev (true :: wordToList x) ++ [false])
-  (rev (false :: wordToList y) ++ [true]).
-Proof. intros s x.
-       induction x; intros.
-       - specialize (WOz y); intros.
-         rewrite H. now compute.
-       - simpl. case_eq b; intros. simpl.
-         rewrite wordToNat_eq5. rewrite IHx.
-
- intros. simpl. rewrite !app_assoc_reverse. simpl.
-Admitted.
-
-Lemma ult_eqft: forall s (x y: word s), 
-(wordToNat x <=? wordToNat y) =
-RAWBITVECTOR_LIST.ult_list_big_endian (rev (wordToList x) ++ [false]) (rev (wordToList y) ++ [true]).
-Proof. intros s x.
-       induction x; intros.
-       - specialize (WOz y); intros.
-         rewrite H. now compute.
-       - rewrite (shatter_word y) in *.
-         unfold wltbNat. simpl.
-         case_eq b; case_eq (whd y); intros. simpl.
-         rewrite wordToNat_eq4. rewrite IHx.
-         rewrite !app_assoc_reverse. simpl. admit.
-         admit.
-         
-
-         specialize (IHx (wtl y)).
-         simpl. case_eq (wordToNat (wtl y) * 2); intros.
-         rewrite !app_assoc_reverse. simpl. admit.
-         
-
-
- admit.
-         
-*)
+Proof. intros. now rewrite Nat_eq4. Qed.
 
 Lemma times2_eq: forall x y, x * 2 = y * 2 <-> x = y.
 Proof. intro x.
@@ -1365,13 +1313,6 @@ Qed.
 Lemma hlp4: forall x y, (S x <=? y) = true -> (x <=? y) = true.
 Proof. intros. apply Nat.ltb_lt in H. apply Nat.leb_le. lia. Qed.
 
-Lemma ult_eqft_w: forall a b,
-length a = length b ->
-RAWBITVECTOR_LIST.ult_list_big_endian a b = true ->
-RAWBITVECTOR_LIST.ult_list_big_endian (a ++ [false]) (b ++ [true]) = true.
-Admitted.
-
-
 Lemma hlp5: forall x y, (S y <=? x) = true -> (S x <=? y) = false.
 Proof. intro x.
        induction x as [ | xs IHx ]; intros.
@@ -1396,20 +1337,6 @@ Proof. intro x.
            apply IHx. subst. now inversion H.
 Qed.
 
-Lemma ult_eqff: forall a b,
-length a = length b ->
-RAWBITVECTOR_LIST.ult_list_big_endian a b = 
-RAWBITVECTOR_LIST.ult_list_big_endian (a ++ [false]) (b ++ [false]).
-Admitted.
-
-Lemma ult_eqft_f: forall a b,
-length a = length b ->
-RAWBITVECTOR_LIST.beq_list a b = false ->
-RAWBITVECTOR_LIST.ult_list_big_endian a b = false ->
-RAWBITVECTOR_LIST.ult_list_big_endian (a ++ [false]) (b ++ [true]) = false.
-Admitted.
-
-
 Lemma wltbNat_true_iff: forall s (x y: word s), 
       wltbNat x y = RAWBITVECTOR_LIST.ult_list (wordToList x) (wordToList y).
 Proof. intros s x.
@@ -1422,13 +1349,13 @@ Proof. intros s x.
          unfold RAWBITVECTOR_LIST.ult_list. simpl.
          rewrite wordToNat_eq1. unfold wltbNat in IHx. rewrite IHx.
          unfold RAWBITVECTOR_LIST.ult_list.
-         rewrite ult_eqtt. reflexivity.
+         rewrite RAWBITVECTOR_LIST.ult_eqtt. reflexivity.
          now rewrite !rev_length, !len_wordToList.
 
          unfold RAWBITVECTOR_LIST.ult_list. simpl.
          rewrite wordToNat_eq2. unfold wltbNat in IHx. rewrite IHx.
          unfold RAWBITVECTOR_LIST.ult_list.
-         rewrite ult_eqtf. reflexivity.
+         rewrite RAWBITVECTOR_LIST.ult_eqtf. reflexivity.
          now rewrite !rev_length, !len_wordToList.
 
          unfold RAWBITVECTOR_LIST.ult_list. simpl.
@@ -1436,15 +1363,15 @@ Proof. intros s x.
          destruct (Nat.compare_spec (wordToNat x) (wordToNat (wtl y))).
          rewrite H1. simpl. apply wordToList_eq2 in H1.
          rewrite H1. specialize (IHx (wtl y)).
-         rewrite Nat.leb_refl. admit.
+         rewrite Nat.leb_refl. now rewrite RAWBITVECTOR_LIST.ult_eqft_t.
+
          specialize (IHx (wtl y)).
          apply Nat.ltb_lt in H1.
          unfold Nat.ltb in H1. rewrite H1 in IHx.
          apply hlp4 in H1. rewrite H1, IHx at 1.
          unfold RAWBITVECTOR_LIST.ult_list. simpl.
 
-
-         rewrite ult_eqft_w at 1. now unfold RAWBITVECTOR_LIST.ult_list in *.
+         rewrite RAWBITVECTOR_LIST.ult_eqft at 1. now unfold RAWBITVECTOR_LIST.ult_list in *.
          rewrite !rev_length. now rewrite !len_wordToList.
          now unfold RAWBITVECTOR_LIST.ult_list in *.
          specialize (IHx (wtl y)).
@@ -1454,17 +1381,24 @@ Proof. intros s x.
          apply hlp6 in H1p. rewrite H1p.
          
          unfold RAWBITVECTOR_LIST.ult_list. simpl.
-         rewrite ult_eqft_f. easy.
+         rewrite RAWBITVECTOR_LIST.ult_eqft_f. easy.
          rewrite !rev_length. now rewrite !len_wordToList.
-         admit.
+         rewrite RAWBITVECTOR_LIST.rev_neq. easy.
+         apply leb_iff_conv in H1p.
+         apply Nat.ltb_lt in H1p.
+         case_eq (RAWBITVECTOR_LIST.beq_list (wordToList x) (wordToList (wtl y))); intros.
+         apply RAWBITVECTOR_LIST.List_eq in H2.
+         apply wordToList_eq in H2. rewrite H2 in H1p.
+         rewrite Nat.ltb_irrefl in H1p. easy. easy.
+
          now unfold RAWBITVECTOR_LIST.ult_list in *.
          
          unfold RAWBITVECTOR_LIST.ult_list. simpl.
          specialize (IHx (wtl y)). unfold wltbNat in *.
-         rewrite wordToNatt_eq1, IHx, <- ult_eqff at 1.
+         rewrite wordToNatt_eq1, IHx, <- RAWBITVECTOR_LIST.ult_eqff at 1.
          now unfold RAWBITVECTOR_LIST.ult_list.
          rewrite !rev_length. now rewrite !len_wordToList.
-Admitted.
+Qed.
 
 (** *)
 

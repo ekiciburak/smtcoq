@@ -3172,6 +3172,12 @@ Proof. intro a.
        induction a as [ | xa xsa IHa ]; intros; easy.
 Qed.
 
+Lemma app_cons_not_nil3 : forall a, a ++ [false] <> [].
+Proof. intro a.
+       induction a as [ | xa xsa IHa ]; intros; easy.
+Qed.
+
+
 Lemma ult_eqft: forall a b,
 length a = length b ->
 RAWBITVECTOR_LIST.ult_list_big_endian a b = true ->
@@ -3295,139 +3301,93 @@ Proof. intro a.
        - simpl in H. rewrite H. case_eq b; now simpl.
 Qed.
 
-(*
-Lemma negb_ch2: forall a b, negb a && b = false -> a && negb b = true.
+Lemma eqb_ch: forall a b, Bool.eqb a b = true -> negb a && b = false.
 Proof. intro a.
        induction a; intros.
-       - simpl. case_eq b; intros; simpl in H.
-       - simpl in H. rewrite H. case_eq b; now simpl.
+       - case_eq b; intros; now simpl.
+       - case_eq b; intros; subst; try now simpl.
 Qed.
-*)
+
+Lemma negb_ch2: forall a b, negb b && a = true ->  Bool.eqb a b = false.
+Proof. intro a.
+       induction a; intros.
+       - simpl. case_eq b; intros; try now simpl. rewrite H0 in H. now simpl in H.
+       - case_eq b; intros; subst; now simpl.
+Qed.
 
 Lemma ult_eqft2: forall a b,
 length a = length b ->
-RAWBITVECTOR_LIST.ult_list_big_endian b a = true ->
+beq_list a b = false ->
+RAWBITVECTOR_LIST.ult_list_big_endian a b = false ->
 RAWBITVECTOR_LIST.ult_list_big_endian (a ++ [false]) (b ++ [true]) = false.
 Proof. intro a.
        induction a as [ | xa xsa IHa  ]; intros.
-       - simpl in H0. admit.
+       - simpl in H. symmetry in H. rewrite empty_list_length in H.
+         rewrite H in *. simpl in *. easy.
        - case_eq b; intros. subst. now contradict H.
          simpl. case_eq (xsa); case_eq l; intros.
          simpl. rewrite andb_true_r. case_eq xa; case_eq b0; intros; subst; now simpl.
          subst. now contradict H.
          subst. now contradict H.
-        simpl. case_eq l1; intros. rewrite H4 in H3. rewrite H3, H1, H2 in H.
-        inversion H. symmetry in H6. rewrite empty_list_length in H6. rewrite H6.
-        simpl. rewrite H1, H2, H6, H3 in H0. simpl in H0. rewrite andb_true_r.
-        rewrite orb_true_iff in H0. destruct H0 as [ H0 | H0].
-        rewrite andb_true_iff in H0. destruct H0 as (H0a, H0b).
-        rewrite beqb_comm in H0a. apply negb_ch in H0b. rewrite andb_comm in H0b.
-        rewrite H0a, H0b. rewrite andb_true_l, orb_false_r. admit. admit.
-        
+         simpl. case_eq l1; intros. simpl.
+         rewrite H5 in H4. rewrite H4, H2 in H.
+         inversion H. rewrite H3 in H7. inversion H7.
+         symmetry in H8. rewrite empty_list_length in H8. rewrite H8.
+         simpl. rewrite H2 in H0. inversion H0.
+         case_eq xa; case_eq b0; intros.
+         case_eq b2; case_eq b1; intros. simpl.
+         subst. easy. simpl. subst. easy.
+         simpl. subst. simpl in H1. now contradict H1.
+         simpl. subst. easy.
+         case_eq b2; case_eq b1; intros. simpl.
+         easy. simpl. easy. simpl. easy. simpl. easy.
+         case_eq b2; case_eq b1; intros. simpl.
+         subst. simpl in H1. now contradict H1.
+         simpl. subst.  simpl in H1. now contradict H1.
+         simpl. subst. simpl in H1. now contradict H1.
+         simpl. subst.  simpl in H1. now contradict H1.
+         case_eq b2; case_eq b1; intros. simpl.
+         subst. easy. simpl. subst. easy.
+         simpl. subst. simpl in H1. now contradict H1.
+         simpl. subst. easy.
 
-
-        case_eq ((b3 :: l2) ++ [false]); intros. contradict H5.
+        case_eq ((b3 :: l2) ++ [false]); intros. contradict H6.
         apply app_cons_not_nil2.
-        
-        rewrite H3, H4, H1, H2 in H0. inversion H5. rewrite <- H7.
-        simpl in H0.
-        case_eq l2; intros. rewrite H6 in H0. rewrite H6 in *. simpl in H8.
-        rewrite <- H8 in *. simpl in H5. inversion H5. rewrite H4 in *.
-        rewrite H3 in *. rewrite H1, H2 in H. inversion H.
-        case_eq l0; intros. rewrite H9 in H11. now contradict H11.
-        rewrite H9 in H11. inversion H11.
-        symmetry in H13. rewrite empty_list_length in H13. rewrite H13 in H9.
-        rewrite H9 in H0. simpl. rewrite H13. simpl. rewrite <- H10.
-        rewrite orb_true_iff in H0. destruct H0 as [ H0 | H0 ].
-        rewrite andb_true_iff in H0. destruct H0 as (H0a, H0b).
-        rewrite orb_true_iff in H0b. destruct H0b as [ H0b | H0b ].
-        rewrite andb_true_iff in H0b. destruct H0b as (H0b1, H0b2). simpl in H0b2.
-        admit. admit. admit.
+        rewrite <- H6, <- H5.
+        rewrite H4, H2, H3 in H1. simpl in H1.
+        rewrite H5, <- H5 in H1.
+        case_eq ( Bool.eqb xa b0 ); intros.
+        rewrite H7 in *. rewrite andb_true_l in *.
+        case_eq (Bool.eqb b2 b1); intros.
+        rewrite H8 in *. rewrite andb_true_l in *.
+        rewrite !orb_false_iff in H1.
+        destruct H1 as ((H1a, H1b), H1c). rewrite H1b, H1c, !orb_false_r.
+        specialize (IHa l). rewrite H4, H3 in IHa. simpl in IHa.
+        rewrite H5, <- H5 in IHa.
+        case_eq (l1 ++ [false]); intros. contradict H1.
+        apply app_cons_not_nil3.
+        rewrite H1, <- H1 in IHa.
+        rewrite H8, !andb_true_l, H1b, !orb_false_r in IHa.
+        rewrite <- H1. apply IHa.
+        rewrite H2, H3, H4 in H. now inversion H.
+        rewrite H2, H3, H4 in H0. inversion H0. 
+        rewrite H7, H8, !andb_true_l in H10.
+        now rewrite H7, H8, !andb_true_l.
+        exact H1a.
 
-        rewrite H6 in H8. rewrite <- H8 in H5. inversion H5.
-        rewrite H6 in H4. rewrite H4 in H3. rewrite H3 in H.
-        rewrite H1, H2 in H. inversion H.
-        case_eq l0; intros. rewrite H9 in H12. now contradict H12.
-        rewrite H9 in H12. simpl in H12. inversion H12.
-        case_eq l5; intros. rewrite H13 in H14. now contradict H14.
-        rewrite H13 in H14. simpl in H14. rewrite H13 in H9.
-        rewrite H9, H6 in H0.
-        simpl in H0. simpl.
-        case_eq l4; intros. rewrite H15 in H14. simpl in H14.
-        inversion H14. symmetry in H17. rewrite empty_list_length in H17.
-        rewrite H15, H17 in H0. rewrite H17. simpl.
+        (** true, false *)
+        rewrite andb_false_l, orb_false_l.
+        rewrite H8 in *. now rewrite andb_false_l, orb_false_l in H1.
 
-        rewrite orb_true_iff in H0. destruct H0 as [ H0 | H0 ].
-        rewrite andb_true_iff in H0. destruct H0 as (H0a, H0b).
-        rewrite orb_true_iff in H0b. destruct H0b as [ H0b1 | H0b2 ].
-        rewrite andb_true_iff in H0b1. destruct H0b1 as (H0b11, H0b12).
-        rewrite orb_true_iff in H0b12. destruct H0b12 as [ H0b12 | H0b12 ].
-        rewrite andb_true_iff in H0b12. destruct H0b12 as (H0b121, H0b122).
-        rewrite <- H10.
-        admit.
-        rewrite <- H10.
-        admit.
-        rewrite <- H10.
-        admit. admit.
+        (** false, true *)
+        case_eq (Bool.eqb b2 b1); intros.
+        rewrite andb_false_l, orb_false_l.
+        rewrite H7 in *. now rewrite andb_false_l, orb_false_l in H1.
 
-       rewrite <- H15. rewrite H15 in H14.
-       simpl in H14. inversion H14.
-       rewrite H15 in H0. rewrite <- H15 in H0.
-       rewrite H15. case_eq ((b8 :: l7) ++ [false]); intros. contradict H16.
-       apply app_cons_not_nil2.
-       rewrite <- H16, <- H15.
-       case_eq l6; intros Hl6. rewrite Hl6 in H17. now contradict H17.
-       intros Hl6a Hl6b. rewrite Hl6b in H0. rewrite <- Hl6b in H0.
-       
-
-       rewrite orb_true_iff  in H0. destruct H0 as [ H0 | H0 ].
-       rewrite andb_true_iff in H0. destruct H0 as (H0a, H0b).
-       rewrite orb_true_iff in H0b. destruct H0b as [ H0b | H0b ].
-       rewrite andb_true_iff in H0b. destruct H0b as (H0b1, H0b2).
-       rewrite orb_true_iff in H0b2. destruct H0b2 as [ H0b2 | H0b2 ].
-       rewrite andb_true_iff in H0b2. destruct H0b2 as (H0b21, H0b22).
-       rewrite orb_true_iff in H0b22. destruct H0b22 as [ H0b22 | H0b22 ].
-       rewrite andb_true_iff in H0b22. destruct H0b22 as (H0b221, H0b222).
-       rewrite <- H10. rewrite beqb_comm in H0a, H0b1, H0b21, H0b221.
-       rewrite H0a, H0b1, H0b21, H0b221, !andb_true_l.
-       assert (negb b5 && b7 = false). { case_eq b5; case_eq b7; intros; subst; simpl in H0b221; try easy. }
-       assert (negb b3 && b6 = false). { case_eq b3; case_eq b6; intros; rewrite H18, H19 in H0b21; simpl in H0b21; try easy. }
-       assert (negb b2 && b1 = false). { case_eq b2; case_eq b1; intros; rewrite H19, H20 in H0b1; simpl in H0b1; try easy. }
-       assert (negb xa && b0 = false). { case_eq xa; case_eq b0; intros; rewrite H20, H21 in H0a; simpl in H0a; try easy. }
-       rewrite H0, H18, H19, H20, !orb_false_r.
-       rewrite <- Hl6b.
-
-       specialize (IHa l). rewrite H9 in H2. rewrite H2, H3 in IHa. simpl in IHa.
-       rewrite H15, H16, H0b1, H0b21, H0b221, <- H15, <- H16, <- H15, H0, H18, H19 in IHa.
-       rewrite !andb_true_l, !orb_false_r in IHa. apply IHa.
-       rewrite H9 in H. inversion H. now rewrite H22.
-
-       rewrite Hl6b. rewrite <- Hl6b.
-       rewrite Hl6b in IHa. rewrite <- Hl6b in IHa.
-
-       rewrite beqb_comm in H0a, H0b1, H0b21, H0b221.
-       rewrite H0b1, H0b21, H0b221, !andb_true_l. rewrite H0b1, H0b21, H0b221 in IHa.
-       assert (ult_list_big_endian l6 l4 || negb b7 && b5 || negb b6 && b3 || negb b1 && b2 = ult_list_big_endian l6 l4) by admit.
-       rewrite H21.
-       apply H0b222.
-
-       rewrite <- H10. rewrite beqb_comm in H0a, H0b1, H0b21.
-       assert (Bool.eqb b5 b7 = false). { case_eq b5; case_eq b7; intros; subst; simpl in H0b22; try easy. }
-
-       rewrite H0, H0a, H0b1, H0b21, !andb_true_l. rewrite andb_false_l.
-       assert (b7 = false) by admit. assert (b5 = true) by admit. rewrite H18, H19. simpl.
-       admit.
-       rewrite <- H10. rewrite beqb_comm in H0a, H0b1.
-       rewrite H0a, H0b1, !andb_true_l.
-       case_eq b3; case_eq b6; intros; rewrite H0, H18 in H0b2; simpl in H0b2; try easy.
-       simpl. admit.
-
-       rewrite beqb_comm in H0a. rewrite H0a, andb_true_l.
-       assert (Bool.eqb b2 b1 = false) by admit. rewrite H0, andb_false_l.
-       apply negb_ch in H0b. rewrite andb_comm in H0b. rewrite H0b. admit.
-Admitted.
-
-
+        (** false, false *)
+        rewrite andb_false_l, orb_false_l.
+        rewrite H7, H8 in *. now rewrite andb_false_l, orb_false_l in H1.
+Qed.
 
 Lemma ult_eqft_f: forall a b,
 length a = length b ->
@@ -3435,31 +3395,21 @@ beq_list a b = false ->
 RAWBITVECTOR_LIST.ult_list_big_endian a b = false ->
 RAWBITVECTOR_LIST.ult_list_big_endian (a ++ [false]) (b ++ [true]) = false.
 Proof. intros. 
-       specialize (@nlt_be_neq_gt a b H H1 H0); intros. 
+       specialize (@nlt_be_neq_gt a b H H1 H0); intros.
        apply ult_eqft2; easy.
 Qed.
 
-(*
-Lemma ult_eqft2: forall a b,
-a <> [] ->
-length a = length b ->
-RAWBITVECTOR_LIST.ult_list_big_endian a b =
-RAWBITVECTOR_LIST.ult_list_big_endian (a ++ [false]) (b ++ [true]).
+
+Lemma ult_eqft_t: forall a,
+RAWBITVECTOR_LIST.ult_list_big_endian (a ++ [false]) (a ++ [true]) = true.
 Proof. intro a.
-       induction a as [ | xa xsa IHa  ]; intros.
-       - now contradict H.
-       - case_eq b; intros. subst. now contradict H.
-         simpl. case_eq xsa; intros.
-         simpl. rewrite H2, H1 in H0. inversion H0. symmetry in H4.
-         rewrite empty_list_length in H4.
-         rewrite H4. simpl in *.
-         specialize (@IHa l). rewrite H2, H4 in IHa. simpl in IHa.
-         case_eq xa; case_eq b0; intros; try now simpl. simpl. apply IHa. easy.
-         case_eq ((b1 :: l0) ++ [true]); intros. now contradict H2.
-         rewrite <- H2, <- H1. rewrite IHa. reflexivity.
-         subst. now inversion H.
+       induction a as [ | xa xsa IHa ]; intros.
+       - now simpl.
+       - simpl. case_eq (xsa ++ [false]); intros.
+         contradict H. apply app_cons_not_nil3.
+         rewrite <- H, IHa. 
+         case_eq xa; intros; now simpl.
 Qed.
-*)
 
 
 End RAWBITVECTOR_LIST.
