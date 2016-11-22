@@ -1,7 +1,7 @@
 (** Fixed precision machine words *)
 Add Rec LoadPath "." as SMTCoq.
 
-Require Import Arith Div2 NArith Bool Omega List BVList.
+Require Import Arith Div2 NArith Bool Omega List BVList Psatz.
 Require Import Nomega.
 
 Local Open Scope list_scope.
@@ -1142,6 +1142,16 @@ Definition wltNat2 sz (l r : word sz) : Prop :=
   Nat.lt (wordToNat l) (wordToNat r).
 
 
+Lemma inj_lt: forall a b, (N.of_nat a < N.of_nat b)%N <-> a < b.
+Proof. intro a.
+       induction a as [ | xa IHa ]; intros; lia.
+Qed.
+
+Lemma wltNatN_eq: forall s (x y: word s), wltNat2 x y <-> wlt x y.
+Proof. intros. unfold wltNat2, wlt, Nat.lt.
+       rewrite !wordToN_nat. split; intros; apply inj_lt; easy.
+Qed.
+
 Lemma wltNat_true_iff: forall s (x y: word s), wltNat x y <-> wltNat2 x y.
 Proof. intros s x.
        induction x; intros.
@@ -1171,7 +1181,15 @@ Proof. intros s x.
          now rewrite H.
 Qed.
 
-Require Import Psatz.
+Lemma wtlbNat_eq: forall s (x y: word s), wltbNat x y = true <-> wltNat x y.
+Proof. intros. unfold wltNat.
+       case_eq (wltbNat x y ); intros; easy.
+Qed.
+
+Lemma lt_eq: forall s (x y: word s),  wltbNat x y = true <-> wlt x y.
+Proof. intros. 
+       now rewrite <- wltNatN_eq, <- wltNat_true_iff, <- wtlbNat_eq.
+Qed.
 
 Lemma wordToNatS_eq1: forall n m, 
 (S n <? S m) = (n <? m).
