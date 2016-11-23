@@ -3114,6 +3114,25 @@ Proof. intro a.
          subst. now inversion H.
 Qed.
 
+Lemma slt_eqtt: forall a b,
+length a = length b ->
+RAWBITVECTOR_LIST.slt_list_big_endian a b =
+RAWBITVECTOR_LIST.slt_list_big_endian (a ++ [true]) (b ++ [true]).
+Proof. intro a.
+       induction a as [ | xa xsa IHa  ]; intros.
+       - simpl in H. symmetry in H. rewrite empty_list_length in H.
+         rewrite H. now simpl.
+       - case_eq b; intros. subst. now contradict H.
+         simpl. case_eq xsa; intros.
+         simpl. subst. inversion H. symmetry in H1. rewrite empty_list_length in H1.
+         rewrite H1. simpl. case_eq xa; case_eq b0; intros; now simpl.
+         case_eq ((b1 :: l0) ++ [true]); intros. now contradict H2.
+         f_equal. apply f_equal.
+         rewrite <- H2, <- H1.
+         apply ult_eqtt.
+         rewrite H0 in H. now inversion H.
+Qed.
+
 Lemma ult_eqtf: forall a b,
 length a = length b ->
 RAWBITVECTOR_LIST.ult_list_big_endian a b =
@@ -3131,6 +3150,15 @@ Proof. intro a.
          subst. now inversion H.
 Qed.
 
+(** reorganize
+
+Lemma ult_eqtf: forall a b,
+length a = length b ->
+RAWBITVECTOR_LIST.slt_list_big_endian a b =
+RAWBITVECTOR_LIST.slt_list_big_endian (a ++ [true]) (b ++ [false]).
+
+*)
+
 Lemma ult_eqff: forall a b,
 length a = length b ->
 RAWBITVECTOR_LIST.ult_list_big_endian a b =
@@ -3147,6 +3175,25 @@ Proof. intro a.
          rewrite <- H2, <- H1. rewrite IHa. reflexivity.
          subst. now inversion H.
 Qed.
+
+Lemma slt_eqff: forall a b,
+length a = length b ->
+RAWBITVECTOR_LIST.slt_list_big_endian a b =
+RAWBITVECTOR_LIST.slt_list_big_endian (a ++ [false]) (b ++ [false]).
+Proof. intro a.
+       induction a as [ | xa xsa IHa  ]; intros.
+       - simpl in H. symmetry in H. rewrite empty_list_length in H.
+         rewrite H. now simpl.
+       - case_eq b; intros. subst. now contradict H.
+         simpl. case_eq xsa; intros.
+         simpl. subst. inversion H. symmetry in H1. rewrite empty_list_length in H1.
+         rewrite H1. simpl. case_eq xa; case_eq b0; intros; now simpl.
+         case_eq ((b1 :: l0) ++ [false]); intros. now contradict H2.
+         f_equal. apply f_equal.
+         rewrite <- H2, <- H1. rewrite ult_eqff. reflexivity.
+         subst. now inversion H.
+Qed.
+
 
 Lemma ult_eqft1: forall a b,
 length a = length b ->
