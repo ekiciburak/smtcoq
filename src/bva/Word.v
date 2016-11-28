@@ -561,6 +561,8 @@ Compute @sext 4 (WS true (WS true (WS true (WS false WO)))) 5.
 Definition zext (sz : nat) (w : word sz) (sz' : nat) : word (sz + sz') :=
   combine w (wzero sz').
 
+Compute @zext 4 (WS true (WS true (WS true (WS false WO)))) 5.
+
 Definition wextr (sz : nat) (w : word sz) (i j: nat) := 
   ListToword (RAWBITVECTOR_LIST.extract (wordToList w) i j).
 

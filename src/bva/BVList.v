@@ -1273,6 +1273,21 @@ Proof. intro n.
        - simpl. apply f_equal. exact IHn.
 Qed.
 
+Lemma mk_list_false_cons_app: forall n, mk_list_false n ++ [false] = false :: mk_list_false n.
+Proof. intro n.
+       induction n as [ | xn IHn ]; intros.
+       - now simpl.
+       - simpl. now rewrite IHn.
+Qed.
+
+Lemma rev_mk_list_false_eq: forall n, List.rev (mk_list_false n) = mk_list_false n.
+Proof. intro n.
+       induction n as [ | xn IHn]; intros.
+       - now simpl.
+       - simpl. rewrite IHn. now rewrite mk_list_false_cons_app.
+Qed.
+
+
 Lemma not_list_true_false: forall n, map negb (mk_list_true n) = mk_list_false n.
 Proof. intro n.
        induction n as [ | n IHn].
@@ -2213,13 +2228,15 @@ Qed.
     end.
 
   Definition zextend (x: list bool) (i: nat): list bool :=
-    extend x i false.
+    List.rev (extend (List.rev x) i false).
 
-  Definition sextend (x: list bool) (i: nat): list bool :=
+  Definition _sextend (x: list bool) (i: nat): list bool :=
     match x with
       | []       => mk_list_false i
       | xb :: x' => extend x i xb
     end.
+  
+  Definition sextend (x: list bool) (i: nat) := (List.rev (_sextend (List.rev x) i)). 
 
   Lemma extend_size_zero: forall i b, (length (extend [] i b)) = i.
   Proof.
@@ -2247,36 +2264,53 @@ Qed.
              rewrite IHi. simpl. lia.
    Qed.
 
+  Lemma l_rev: forall {A} (a: list A), length (List.rev a) = length a.
+  Proof. intros A a.
+         induction a as [ | xa xsa IHa ]; intros.
+         - now simpl.
+         - simpl. rewrite <- IHa. rewrite !rev_length.
+           rewrite app_length. simpl. lia.
+  Qed. 
+
   Lemma zextend_size_zero: forall i, (length (zextend [] i)) = i.
   Proof.
-    intros. unfold zextend. apply extend_size_zero. 
+    intros. unfold zextend. rewrite rev_length. simpl. apply extend_size_zero. 
   Qed.
 
   Lemma zextend_size_one: forall i a, length (zextend [a] i) = S i.
   Proof.
-    intros. unfold zextend. apply extend_size_one. 
+    intros. unfold zextend. rewrite rev_length. simpl.  apply extend_size_one. 
   Qed.
 
   Lemma length_zextend: forall a i, length (zextend a i) = ((length a) + i)%nat.
   Proof.
-     intros. unfold zextend. apply length_extend.
+     intros. unfold zextend.  rewrite rev_length. rewrite length_extend.
+     now rewrite rev_length.
   Qed.
 
   Lemma sextend_size_zero: forall i, (length (sextend [] i)) = i.
   Proof.
-    intros. unfold sextend. now rewrite length_mk_list_false.
+    intros. unfold sextend. simpl. now rewrite rev_length, length_mk_list_false.
   Qed.
 
   Lemma sextend_size_one: forall i a, length (sextend [a] i) = S i.
   Proof.
-    intros. unfold sextend. apply extend_size_one. 
+    intros. unfold sextend. simpl. rewrite rev_length. apply extend_size_one. 
+  Qed.
+
+  Lemma app_not_nil: forall (a: list bool) b, a ++ [b] <> [].
+  Proof. intro a.
+       induction a as [ | xa xsa IHa ]; intros; simpl; easy.
   Qed.
 
   Lemma length_sextend: forall a i, length (sextend a i) = ((length a) + i)%nat.
   Proof.
      intros. unfold sextend.
-     case_eq a. intros. rewrite length_mk_list_false. easy.
-     intros. apply length_extend.
+     case_eq a. intros. simpl. rewrite rev_length, length_mk_list_false. easy.
+     intros. simpl. rewrite rev_length. unfold _sextend.
+     case_eq (List.rev l ++ [b]); intros. contradict H0.
+     apply app_not_nil.
+     rewrite length_extend. rewrite <- H0, app_length, rev_length. simpl. lia.
   Qed.
 
   (** bit-vector extension *)
@@ -2294,10 +2328,12 @@ Qed.
   Proof.
     intros. unfold bv_zextn, zextend, size in *.
     rewrite <- N2Nat.id. apply f_equal. 
-    specialize (@length_extend a (nat_of_N i) false). intros.
+    specialize (@length_extend (List.rev a) (nat_of_N i) false). intros.
+    rewrite rev_length.
     rewrite H0. rewrite plus_distr. rewrite plus_comm.
     apply f_equal.
     apply (f_equal (N.to_nat)) in H.
+    rewrite rev_length.
     now rewrite Nat2N.id in H.
   Qed.
 
@@ -2307,14 +2343,16 @@ Qed.
     intros. unfold bv_sextn, sextend, size in *.
     rewrite <- N2Nat.id. apply f_equal.
     case_eq a.
-    intros. rewrite length_mk_list_false.
-    rewrite H0 in H. simpl in H. rewrite <- H.
-    lia.
+    intros. simpl. rewrite rev_length, length_mk_list_false.
+    subst. simpl. lia.
     intros.
     specialize (@length_extend a (nat_of_N i) b). intros.
     subst. rewrite plus_distr. rewrite plus_comm.
     rewrite Nat2N.id.
-    now rewrite <- H1.
+    simpl. rewrite rev_length. unfold _sextend.
+    case_eq (List.rev l ++ [b]); intros.
+    contradict H. apply app_not_nil.
+    rewrite <- H, length_extend, app_length, rev_length. simpl. lia.
   Qed.
 
 
