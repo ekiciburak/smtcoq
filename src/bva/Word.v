@@ -556,12 +556,9 @@ Definition sext (sz : nat) (w : word sz) (sz' : nat) : word (sz + sz') :=
   else 
     combine w (wzero sz').
 
-Compute @sext 4 (WS true (WS true (WS true (WS false WO)))) 5.
 
 Definition zext (sz : nat) (w : word sz) (sz' : nat) : word (sz + sz') :=
   combine w (wzero sz').
-
-Compute @zext 4 (WS true (WS true (WS true (WS false WO)))) 5.
 
 Definition wextr (sz : nat) (w : word sz) (i j: nat) := 
   ListToword (RAWBITVECTOR_LIST.extract (wordToList w) i j).
@@ -573,13 +570,16 @@ Definition wneg sz (x : word sz) : word sz :=
   NToWord sz (Npow2 sz - wordToN x).
 
 
-Compute @wneg 4 (WS false (WS false (WS true (WS true (WO))))).
-
 Definition wordBin (f : N -> N -> N) sz (x y : word sz) : word sz :=
   NToWord sz (f (wordToN x) (wordToN y)).
 
+
+Definition wordBinNat (f : nat -> nat -> nat) sz (x y : word sz) : word sz :=
+  natToWord sz (f (wordToNat x) (wordToNat y)).
+
 Definition wplus := wordBin Nplus.
 Definition wmult := wordBin Nmult.
+Definition wmultNat := wordBinNat Nat.mul.
 
 
 Lemma ltWn: forall n, (_ListToword [] n) = wzero n.
@@ -1024,7 +1024,6 @@ Definition wxor := bitwp xorb.
 
 Definition wbitOf (s: nat) (w: word s) (n: nat) := nth n (wordToList w) false.
 
- Check wand.
 
 Notation "l ^| r" := (@wor _ l%word r%word) (at level 50, left associativity).
 Notation "l ^& r" := (@wand _ l%word r%word) (at level 40, left associativity).

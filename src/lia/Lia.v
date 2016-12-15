@@ -371,7 +371,7 @@ Section certif.
       (Atom.interp_form_hatom t_i t_func t_atom).
 
     Local Notation interp_form_hatom_bv :=
-      (Atom.interp_form_hatom_bv t_i t_func t_atom).
+      (Atom.interp_form_hatom_word t_i t_func t_atom).
 
     Local Notation rho :=
       (Form.interp_state_var interp_form_hatom interp_form_hatom_bv t_form).

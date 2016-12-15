@@ -58,14 +58,14 @@ Section Arith.
 
     Local Notation interp_form_hatom :=
       (Atom.interp_form_hatom t_i t_func t_atom).
-    Local Notation interp_form_hatom_bv :=
-      (Atom.interp_form_hatom_bv t_i t_func t_atom).
+    Local Notation interp_form_hatom_word :=
+      (Atom.interp_form_hatom_word t_i t_func t_atom).
     Local Notation rho :=
-      (Form.interp_state_var interp_form_hatom interp_form_hatom_bv t_form).
+      (Form.interp_state_var interp_form_hatom interp_form_hatom_word t_form).
 
 
     Let wf_rho : Valuation.wf rho.
-    Proof. destruct (Form.check_form_correct interp_form_hatom interp_form_hatom_bv _ ch_form); auto. Qed.
+    Proof. destruct (Form.check_form_correct interp_form_hatom interp_form_hatom_word _ ch_form); auto. Qed.
 
     Hint Immediate wf_rho.
 

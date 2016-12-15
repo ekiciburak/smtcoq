@@ -255,15 +255,15 @@ Section CHECKER.
   (** The correctness proofs *)
 
   Variable interp_atom : atom -> bool.
-  Variable interp_bvatom : atom -> forall s, BITVECTOR_LIST.bitvector s.
+  Variable interp_wordatom : atom -> forall s, Word.word s.
 
   Hypothesis Hch_f : check_form t_form.
 
-  Local Notation rho := (Form.interp_state_var interp_atom interp_bvatom t_form).
+  Local Notation rho := (Form.interp_state_var interp_atom interp_wordatom t_form).
 
   Let Hwfrho : Valuation.wf rho.
   Proof.
-    destruct (check_form_correct interp_atom interp_bvatom _ Hch_f) as (_, H);exact H. 
+    destruct (check_form_correct interp_atom interp_wordatom _ Hch_f) as (_, H);exact H. 
   Qed.
 
   Lemma valid_check_True : C.valid rho check_True.
@@ -280,9 +280,9 @@ Section CHECKER.
   Qed.
 
   Let rho_interp : forall x : int,
-    rho x = interp interp_atom interp_bvatom t_form (t_form.[ x]).
+    rho x = interp interp_atom interp_wordatom t_form (t_form.[ x]).
   Proof.
-    destruct (check_form_correct interp_atom interp_bvatom _ Hch_f) as ((H,H0), _).
+    destruct (check_form_correct interp_atom interp_wordatom _ Hch_f) as ((H,H0), _).
     intros x;apply wf_interp_form;trivial.
   Qed.
 
