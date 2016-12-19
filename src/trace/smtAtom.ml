@@ -115,6 +115,21 @@ let mk_bvsize n =
       else assert false
     | _ -> assert false
   else mk_N n
+  
+  (* size of words are either (length l) or an n *)
+let mk_wordsize n =
+  let c, args = Term.decompose_app n in
+  if Term.eq_constr c (Lazy.force cof_nat) then
+    match args with
+    | [nl] ->
+      let c, args = Term.decompose_app nl in
+      if Term.eq_constr c (Lazy.force clength) then
+        match args with
+        | [_; l] -> List.length (mk_bool_list l)
+        | _ -> assert false
+      else assert false
+    | _ -> assert false
+  else mk_nat n
 
 
 module Btype = 
@@ -205,6 +220,11 @@ module Btype =
               Term.eq_constr c (Lazy.force cTBV) then
         match args with
         | [s] -> TBV (mk_bvsize s)
+        | _ -> assert false
+      else if Term.eq_constr c (Lazy.force cword) ||
+              Term.eq_constr c (Lazy.force cTWord) then
+        match args with
+        | [s] -> TWord (mk_wordsize s)
         | _ -> assert false
       else if Term.eq_constr c (Lazy.force cfarray) ||
               Term.eq_constr c (Lazy.force cTFArray) then
