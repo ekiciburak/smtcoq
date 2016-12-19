@@ -290,7 +290,7 @@ let rec term_smtcoq_old t =
          (let ha = term_smtcoq_atom a in
           let hb = term_smtcoq_atom b in
           match Atom.type_of ha with
-            | TBV s -> Atom (Atom.mk_bvadd ra s ha hb)
+            | TBV s -> Atom (Atom.mk_wplus ra s ha hb)
             | _ -> assert false)
       | Some (n, [_; a; b]) when n == H.bvmul ->
          (let ha = term_smtcoq_atom a in

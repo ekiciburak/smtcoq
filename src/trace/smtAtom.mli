@@ -92,7 +92,7 @@ type bop =
    | BO_BVand of int
    | BO_BVor of int
    | BO_BVxor of int
-   | BO_BVadd of int
+   | BO_Wplus of int
    | BO_BVmult of int
    | BO_BVult of int
    | BO_BVslt of int
@@ -204,7 +204,7 @@ module Atom :
       val mk_bvand : reify_tbl -> int -> hatom -> hatom -> hatom
       val mk_bvor : reify_tbl -> int -> hatom -> hatom -> hatom
       val mk_bvxor : reify_tbl -> int -> hatom -> hatom -> hatom
-      val mk_bvadd : reify_tbl -> int -> hatom -> hatom -> hatom
+      val mk_wplus : reify_tbl -> int -> hatom -> hatom -> hatom
       val mk_bvmult : reify_tbl -> int -> hatom -> hatom -> hatom
       val mk_bvult : reify_tbl -> int -> hatom -> hatom -> hatom
       val mk_bvslt : reify_tbl -> int -> hatom -> hatom -> hatom

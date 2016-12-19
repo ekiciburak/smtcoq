@@ -307,7 +307,6 @@ type bop =
    | BO_BVand of int
    | BO_BVor of int
    | BO_BVxor of int
-   | BO_BVadd of int
    
    | BO_Wplus of int
    
@@ -447,7 +446,6 @@ module Op =
       | BO_BVand s -> mklApp cBO_BVand [|mkN s|]
       | BO_BVor s -> mklApp cBO_BVor [|mkN s|]
       | BO_BVxor s -> mklApp cBO_BVxor [|mkN s|]
-      | BO_BVadd s -> mklApp cBO_BVadd [|mkN s|]
       
       | BO_Wplus s -> mklApp cBO_Wplus [|mkN s|]
       
@@ -462,7 +460,7 @@ module Op =
       | BO_Zplus | BO_Zminus | BO_Zmult -> TZ
       | BO_Zlt | BO_Zle | BO_Zge | BO_Zgt | BO_eq _
       | BO_BVult _ | BO_BVslt _ -> Tbool
-      | BO_BVand s | BO_BVor s | BO_BVxor s | BO_BVadd s | BO_Wplus s | BO_BVmult s -> TBV s
+      | BO_BVand s | BO_BVor s | BO_BVxor s | BO_Wplus s | BO_BVmult s -> TBV s
       | BO_BVconcat (s1, s2) -> TBV (s1 + s2)
       | BO_select (_, te) -> te
       | BO_diffarray (ti, _) -> ti
@@ -471,7 +469,7 @@ module Op =
       | BO_Zplus | BO_Zminus | BO_Zmult 
       | BO_Zlt | BO_Zle | BO_Zge | BO_Zgt -> (TZ,TZ)
       | BO_eq t -> (t,t)
-      | BO_BVand s | BO_BVor s | BO_BVxor s | BO_BVadd s | BO_Wplus s | BO_BVmult s
+      | BO_BVand s | BO_BVor s | BO_BVxor s | BO_Wplus s | BO_BVmult s
       | BO_BVult s | BO_BVslt s ->
         (TBV s,TBV s)
       | BO_BVconcat (s1, s2) -> (TBV s1, TBV s2)
@@ -544,9 +542,8 @@ module Op =
       | BO_BVand s -> mklApp cbv_and [|mkN s|]
       | BO_BVor s -> mklApp cbv_or [|mkN s|]
       | BO_BVxor s -> mklApp cbv_xor [|mkN s|]
-      | BO_BVadd s -> mklApp cbv_add [|mkN s|]
       
-      | BO_Wplus s -> mklApp cwplus [|mkN s|]
+      | BO_Wplus s -> mklApp cbv_wplus [|mkN s|]
       
       | BO_BVmult s -> mklApp cbv_mult [|mkN s|]
       | BO_BVult s -> mklApp cbv_ult [|mkN s|]
@@ -652,7 +649,6 @@ module Op =
         | BO_BVand n1, BO_BVand n2 -> n1 == n2
         | BO_BVor n1, BO_BVor n2 -> n1 == n2
         | BO_BVxor n1, BO_BVxor n2 -> n1 == n2
-        | BO_BVadd n1, BO_BVadd n2 -> n1 == n2
         
         | BO_Wplus n1, BO_Wplus n2 -> n1 == n2
         
@@ -701,7 +697,6 @@ module Op =
       | BO_BVand _
       | BO_BVor _
       | BO_BVxor _
-      | BO_BVadd _
       
       | BO_Wplus _
       
@@ -939,7 +934,6 @@ module Atom =
         | BO_BVand _ -> "bvand"
         | BO_BVor _ -> "bvor"
         | BO_BVxor _ -> "bvxor"
-        | BO_BVadd _ -> "bvadd"
         
         | BO_Wplus _ -> "wplus"
         
@@ -1047,7 +1041,6 @@ module Atom =
       | CCBVand
       | CCBVor
       | CCBVxor
-      | CCBVadd
       
       | CCWplus
       
@@ -1079,7 +1072,7 @@ module Atom =
           cadd,CCZplus; csub,CCZminus; cmul,CCZmult; cltb,CCZlt;
           cleb,CCZle; cgeb,CCZge; cgtb,CCZgt;
           cbv_and, CCBVand; cbv_or, CCBVor; cbv_xor, CCBVxor;
-          cbv_add, CCBVadd; cwplus, CCWplus; cbv_mult, CCBVmult;
+          cbv_wplus, CCWplus; cbv_mult, CCBVmult;
           cbv_ult, CCBVult; cbv_slt, CCBVslt; cbv_concat, CCBVconcat;
           ceqb,CCeqb; ceqbP,CCeqbP; ceqbZ, CCeqbZ; cbv_eq, CCeqbBV;
           cselect, CCselect; cdiff, CCdiff;
@@ -1125,7 +1118,6 @@ module Atom =
           | CCBVand -> mk_bop_bvand args
           | CCBVor -> mk_bop_bvor args
           | CCBVxor -> mk_bop_bvxor args
-          | CCBVadd -> mk_bop_bvadd args
           
           | CCWplus -> mk_bop_wplus args
           
@@ -1227,11 +1219,14 @@ module Atom =
           mk_bop (BO_BVxor s') [a1;a2]
         | _ -> assert false
 
+(*
       and mk_bop_bvadd = function
         | [s;a1;a2] ->
            let s' = mk_bvsize s in
            mk_bop (BO_BVadd s') [a1;a2]
         | _ -> assert false
+      
+*)
         
      and mk_bop_wplus = function
         | [s;a1;a2] ->
@@ -1424,7 +1419,7 @@ module Atom =
             (hatom_pos_of_bigint reify (Big_int.minus_big_int i))
 
     let mk_eq reify ty h1 h2 =
-      let op = BO_eq ty in
+      let op = BO_eq ty in	
       try
         HashAtom.find reify.tbl (Abop (op, h1, h2))
       with
@@ -1445,9 +1440,8 @@ module Atom =
     let mk_bvand reify s = mk_binop (BO_BVand s) reify
     let mk_bvor reify s = mk_binop (BO_BVor s) reify
     let mk_bvxor reify s = mk_binop (BO_BVxor s) reify
-    let mk_bvadd reify s = mk_binop (BO_BVadd s) reify
     
-    let mk_bvadd reify s = mk_binop (BO_Wplus s) reify
+    let mk_wplus reify s = mk_binop (BO_Wplus s) reify
     
     let mk_bvmult reify s = mk_binop (BO_BVmult s) reify
     let mk_bvult reify s = mk_binop (BO_BVult s) reify

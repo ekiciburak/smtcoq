@@ -1,5 +1,5 @@
 Require Import SMTCoq.
-Require Import Bool PArray Int63 List ZArith.
+Require Import Bool PArray Int63 List ZArith Word.
 Import ListNotations.
 Local Open Scope list_scope.
 
@@ -25,6 +25,9 @@ Section Arrays.
 
   Local Open Scope farray_scope.
   Local Open Scope bv_scope.
+
+  Goal forall n (a b: word n), weqb (Word.wplus a b) (Word.wplus b a).
+  Proof. cvc4.
 
   
   (* Goal forall (a b c d: farray Z Z), *)

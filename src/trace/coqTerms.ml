@@ -132,7 +132,9 @@ let cbv_neg = gen_constant bv_modules "bv_neg"
 let cbv_and = gen_constant bv_modules "bv_and"
 let cbv_or = gen_constant bv_modules "bv_or"
 let cbv_xor = gen_constant bv_modules "bv_xor"
-let cbv_add = gen_constant bv_modules "bv_add"
+
+let cbv_wplus = gen_constant bv_modules "wplus"
+
 let cbv_mult = gen_constant bv_modules "bv_mult"
 let cbv_ult = gen_constant bv_modules "bv_ult"
 let cbv_slt = gen_constant bv_modules "bv_slt"
@@ -142,7 +144,7 @@ let cbv_zextn = gen_constant bv_modules "bv_zextn"
 let cbv_sextn = gen_constant bv_modules "bv_sextn"
 
 (* Words *)
-let cwplus = gen_constant bv_modules "wplus"
+(*let cwplus = gen_constant bv_modules "wplus"*)
 
 (* Arrays *)
 let array_modules = [["SMTCoq";"array";"FArray"]]
@@ -229,9 +231,9 @@ let cBO_eq = gen_constant smt_modules "BO_eq"
 let cBO_BVand = gen_constant smt_modules "BO_BVand"
 let cBO_BVor = gen_constant smt_modules "BO_BVor"
 let cBO_BVxor = gen_constant smt_modules "BO_BVxor"
-let cBO_BVadd = gen_constant smt_modules "BO_BVadd"
-
 let cBO_Wplus = gen_constant smt_modules "BO_Wplus"
+
+(*let cBO_Wplus = gen_constant smt_modules "BO_Wplus"*)
 
 let cBO_BVmult = gen_constant smt_modules "BO_BVmult"
 let cBO_BVult = gen_constant smt_modules "BO_BVult"
@@ -285,7 +287,7 @@ let make_certif_ops modules args =
   gen_constant "BBVar", gen_constant "BBConst",
   gen_constant "BBOp", gen_constant "BBNot", gen_constant "BBEq",
   gen_constant "BBDiseq",
-  gen_constant "BBNeg", gen_constant "BBAdd", gen_constant "Wplus", gen_constant "BBMul",
+  gen_constant "BBNeg", gen_constant "Wplus", gen_constant "BBMul",
   gen_constant "BBUlt", gen_constant "BBSlt", gen_constant "BBConcat",
   gen_constant "BBExtract", gen_constant "BBZextend", gen_constant "BBSextend",
   gen_constant "RowEq", gen_constant "RowNeq", gen_constant "Ext",
