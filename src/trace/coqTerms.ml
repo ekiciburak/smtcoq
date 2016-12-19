@@ -64,7 +64,7 @@ let cZneg = gen_constant z_modules "Zneg"
 let copp = gen_constant z_modules "opp"
 let cadd = gen_constant z_modules "add"
 
-let cplus = gen_constant z_modules "plus"
+(* let cplus = gen_constant z_modules "plus" *)
 
 let csub = gen_constant z_modules "sub"
 let cmul = gen_constant z_modules "mul"
@@ -133,9 +133,6 @@ let cbv_and = gen_constant bv_modules "bv_and"
 let cbv_or = gen_constant bv_modules "bv_or"
 let cbv_xor = gen_constant bv_modules "bv_xor"
 let cbv_add = gen_constant bv_modules "bv_add"
-
-let cwplus = gen_constant bv_modules "wplus"
-
 let cbv_mult = gen_constant bv_modules "bv_mult"
 let cbv_ult = gen_constant bv_modules "bv_ult"
 let cbv_slt = gen_constant bv_modules "bv_slt"
