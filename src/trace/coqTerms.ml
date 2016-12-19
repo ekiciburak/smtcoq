@@ -143,9 +143,9 @@ let cbv_zextn = gen_constant bv_modules "bv_zextn"
 let cbv_sextn = gen_constant bv_modules "bv_sextn"
 
 (* Words *)
-let bv_modules = [["SMTCoq";"bva";"Word"]]
-let cword = gen_constant bv_modules "word"
-let cbv_wplus = gen_constant bv_modules "wplus"
+let word_modules = [["SMTCoq";"bva";"Word"]]
+let cword = gen_constant word_modules "word"
+let cbv_wplus = gen_constant word_modules "wplus"
 
 (* Arrays *)
 let array_modules = [["SMTCoq";"array";"FArray"]]
