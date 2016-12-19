@@ -261,7 +261,7 @@ let make_root ra rf t =
         (match make_root_term a, make_root_term b with
          | Atom a', Atom b' ->
            (match Atom.type_of a' with
-            | TBV s -> Atom (Atom.mk_wplus ra s a' b')
+            | TWord s -> Atom (Atom.mk_wplus ra s a' b')
             | _ -> assert false)
          | _, _ -> assert false)
       | "bvmul", [a;b] ->

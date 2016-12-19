@@ -257,7 +257,7 @@ term:   /* returns a SmtAtom.Form.pform or a SmtAtom.hatom */
   | BVADD name_term name_term {
     match $2,$3 with
       | Atom h1, Atom h2 -> (match Atom.type_of h1 with
-                             | TBV s -> Atom (Atom.mk_bvadd ra s h1 h2)
+                             | TWord s -> Atom (Atom.mk_wplus ra s h1 h2)
                              | _ -> assert false)
       | _,_ -> assert false
     }         

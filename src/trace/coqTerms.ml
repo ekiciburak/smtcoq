@@ -176,6 +176,7 @@ let cTZ = gen_constant smt_modules "TZ"
 let cTbool = gen_constant smt_modules "Tbool"
 let cTpositive = gen_constant smt_modules "Tpositive"
 let cTBV = gen_constant smt_modules "TBV"
+let cTWord = gen_constant smt_modules "TWord"
 let cTindex = gen_constant smt_modules "Tindex"
 let cTFArray = gen_constant smt_modules "TFArray"
 
@@ -231,6 +232,7 @@ let cBO_eq = gen_constant smt_modules "BO_eq"
 let cBO_BVand = gen_constant smt_modules "BO_BVand"
 let cBO_BVor = gen_constant smt_modules "BO_BVor"
 let cBO_BVxor = gen_constant smt_modules "BO_BVxor"
+
 let cBO_Wplus = gen_constant smt_modules "BO_Wplus"
 
 (*let cBO_Wplus = gen_constant smt_modules "BO_Wplus"*)

@@ -46,6 +46,7 @@ type logic_item =
   | LUF
   | LLia
   | LBitvectors
+  | LWords
   | LArrays
 
 module SL = Set.Make (struct

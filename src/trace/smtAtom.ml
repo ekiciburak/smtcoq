@@ -31,6 +31,7 @@ type btype =
   | Tbool
   | Tpositive
   | TBV of int
+  | TWord of int
   | Tindex of indexed_type
   | TFArray of btype * btype
 
@@ -134,6 +135,7 @@ module Btype =
       match t1,t2 with
         | Tindex i, Tindex j -> i.index == j.index
         | TBV i, TBV j -> i == j
+        | TWord i, TWord j -> i == j
         | TFArray (ti, te), TFArray (ti', te') -> equal ti ti' && equal te te'
         | _ -> t1 == t2
 
@@ -142,6 +144,7 @@ module Btype =
       | Tbool -> Lazy.force cTbool
       | Tpositive -> Lazy.force cTpositive
       | TBV n -> mklApp cTBV [|mkN n|]
+      | TWord n -> mklApp cTWord [|mkN n|]
       | Tindex i -> index_to_coq i
       | TFArray (ti, te) ->
         mklApp cTFArray [|to_coq ti; to_coq te|]
@@ -151,6 +154,7 @@ module Btype =
       | Tbool -> Format.fprintf fmt "Bool"
       | Tpositive -> Format.fprintf fmt "Int"
       | TBV i -> Format.fprintf fmt "(_ BitVec %i)" i
+      | TWord i -> Format.fprintf fmt "(_ Word %i)" i
       | Tindex i -> Format.fprintf fmt "Tindex_%i" i.index
       | TFArray (ti, te) ->
         Format.fprintf fmt "(Array %a %a)" to_smt ti to_smt te
@@ -159,6 +163,7 @@ module Btype =
       | TZ | Tpositive -> SL.singleton LLia
       | Tbool -> SL.empty
       | TBV _ -> SL.singleton LBitvectors
+      | TWord _ -> SL.singleton LWords
       | Tindex _ -> SL.singleton LUF
       | TFArray (ti, te) -> SL.add LArrays (SL.union (logic ti) (logic te))
           
