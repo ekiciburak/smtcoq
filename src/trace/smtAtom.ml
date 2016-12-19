@@ -143,7 +143,7 @@ module Btype =
       | Tbool -> Lazy.force cTbool
       | Tpositive -> Lazy.force cTpositive
       | TBV n -> mklApp cTBV [|mkN n|]
-      | TWord n -> mklApp cTWord [|mkN n|]
+      | TWord n -> mklApp cTWord [|mkNat n|]
       | Tindex i -> index_to_coq i
       | TFArray (ti, te) ->
         mklApp cTFArray [|to_coq ti; to_coq te|]
@@ -267,7 +267,7 @@ module Btype =
       | Tbool -> Lazy.force cbool
       | Tpositive -> Lazy.force cpositive
       | TBV n -> mklApp cbitvector [|mkN n|]
-      | TWord	 n -> mklApp cword [|mkN n|]
+      | TWord	 n -> mklApp cword [|mkNat n|]
       | Tindex c -> mklApp cte_carrier [|c.hval|]
       (* | TFArray _ as t -> interp_t t_i t *)
       | TFArray (ti,te) ->
