@@ -76,7 +76,6 @@ let rec mk_positive n =
     | _ -> assert false
   else assert false
 
-
 let mk_N n =
   let c, args = Term.decompose_app n in
   if Term.eq_constr c (Lazy.force cN0) then
@@ -268,6 +267,7 @@ module Btype =
       | Tbool -> Lazy.force cbool
       | Tpositive -> Lazy.force cpositive
       | TBV n -> mklApp cbitvector [|mkN n|]
+      | TWord	 n -> mklApp cword [|mkN n|]
       | Tindex c -> mklApp cte_carrier [|c.hval|]
       (* | TFArray _ as t -> interp_t t_i t *)
       | TFArray (ti,te) ->

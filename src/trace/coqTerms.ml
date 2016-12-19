@@ -123,6 +123,9 @@ let crefl_equal = gen_constant init_modules "eq_refl"
 (* Bit vectors *)
 let bv_modules = [["SMTCoq";"bva";"BVList";"BITVECTOR_LIST"]]
 let cbitvector = gen_constant bv_modules "bitvector"
+
+
+
 let cof_bits = gen_constant bv_modules "of_bits"
 let c_of_bits = gen_constant bv_modules "_of_bits"
 let cbitOf = gen_constant bv_modules "bitOf"
@@ -133,7 +136,7 @@ let cbv_and = gen_constant bv_modules "bv_and"
 let cbv_or = gen_constant bv_modules "bv_or"
 let cbv_xor = gen_constant bv_modules "bv_xor"
 
-let cbv_wplus = gen_constant bv_modules "wplus"
+
 
 let cbv_mult = gen_constant bv_modules "bv_mult"
 let cbv_ult = gen_constant bv_modules "bv_ult"
@@ -142,6 +145,10 @@ let cbv_concat = gen_constant bv_modules "bv_concat"
 let cbv_extr = gen_constant bv_modules "bv_extr"
 let cbv_zextn = gen_constant bv_modules "bv_zextn"
 let cbv_sextn = gen_constant bv_modules "bv_sextn"
+
+let bv_modules = [["SMTCoq";"bva";"Word"]]
+let cword = gen_constant bv_modules "word"
+let cbv_wplus = gen_constant bv_modules "wplus"
 
 (* Words *)
 (*let cwplus = gen_constant bv_modules "wplus"*)

@@ -21,12 +21,13 @@ Infix "-->" := implb (at level 60, right associativity) : bool_scope.
 
 Section Arrays.
   Import BVList.BITVECTOR_LIST.
+  Import Word.
   Import FArray.
 
   Local Open Scope farray_scope.
   Local Open Scope bv_scope.
 
-  Goal forall n (a b: word n), weqb (Word.wplus a b) (Word.wplus b a).
+  Goal forall n (a b: word n), weqb (wplus a b) (wplus b a).
   Proof. cvc4.
 
   

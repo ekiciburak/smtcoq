@@ -265,7 +265,7 @@ Module Typ.
   | TZ : type
   | Tbool : type
   | Tpositive : type
-(*  | TBV : N -> type *)
+  | TBV : N -> type 
   | TWord : nat -> type.
 
   
@@ -294,7 +294,7 @@ Module Typ.
       | TZ => existT (fun ty : Type => CompDec ty) Z Z_compdec
       | Tbool => existT (fun ty : Type => CompDec ty) bool bool_compdec
       | Tpositive => existT (fun ty : Type => CompDec ty) positive Positive_compdec
-  (*    | TBV n => existT (fun ty : Type => CompDec ty) (BITVECTOR_LIST.bitvector n) (BV_compdec n) *)
+      | TBV n => existT (fun ty : Type => CompDec ty) (BITVECTOR_LIST.bitvector n) (BV_compdec n)
       | TWord n => existT (fun ty : Type => CompDec ty) (word n) (Word_compdec n)
       end.
 
@@ -424,7 +424,7 @@ Module Typ.
         | TZ => Z.eqb (* Zeq_bool *)
         | Tbool => Bool.eqb
         | Tpositive => Peqb
-    (*    | TBV n => (@BITVECTOR_LIST.bv_eq n) *)
+        | TBV n => (@BITVECTOR_LIST.bv_eq n)
         | TWord n => @weqb n
         | TFArray ti te => i_eqb (TFArray ti te)
         end.
@@ -553,12 +553,11 @@ Module Typ.
       | TZ, TZ => idcast
       | Tbool, Tbool => idcast
       | Tpositive, Tpositive => idcast
-  (*    | TBV n, TBV m =>
+      | TBV n, TBV m =>
         match N_cast n m with
         | Some k => Cast (fun P => k (fun y => P (TBV y)))
         | None => NoCast
         end
-  *)
       | TWord n, TWord m =>
         match nat_cast n m with
         | Some k => Cast (fun P => k (fun y => P (TWord y)))
@@ -597,7 +596,7 @@ Module Typ.
       destruct A;simpl;trivial.
       do 2 rewrite cast_refl. easy.
       rewrite Int63Properties.cast_refl;trivial.
-      (* rewrite N_cast_refl;trivial. *)
+      rewrite N_cast_refl;trivial.
       (*TWord*) rewrite nat_cast_refl; trivial.
     Qed.
 
@@ -609,7 +608,7 @@ Module Typ.
       | TZ, TZ => true
       | Tbool, Tbool => true
       | Tpositive, Tpositive => true
-  (*    | TBV n, TBV m => N.eqb n m *)
+      | TBV n, TBV m => N.eqb n m 
       | TWord n, TWord m => Nat.eqb n m
       | TFArray k1 e1, TFArray k2 e2 =>
         eqb k1 k2 && eqb e1 e2
@@ -666,7 +665,7 @@ Module Typ.
       destruct H; apply cast_diff in H; rewrite H; auto.
       case (cast A1 B1); auto.
       intros H. rewrite (Int63Properties.cast_diff _ _ H);trivial.
-     (* rewrite N.eqb_neq. intro Heq. now rewrite N_cast_diff. *)
+      rewrite N.eqb_neq. intro Heq. now rewrite N_cast_diff.
       (* TWord *) rewrite Nat.eqb_neq. intro Heq. now rewrite nat_cast_diff.
     Qed.
 
@@ -703,7 +702,7 @@ Module Typ.
       apply (reflect_iff _ _ (reflect_eqb x2 y2)) in H0.
       subst; auto.
       apply iff_reflect;rewrite Int63Properties.eqb_spec;split;intros H;[inversion H | subst]; trivial.
-     (* apply iff_reflect. rewrite N.eqb_eq. split;intros H;[inversion H | subst]; trivial. *)
+      apply iff_reflect. rewrite N.eqb_eq. split;intros H;[inversion H | subst]; trivial.
       (* TWord *) apply iff_reflect. rewrite Nat.eqb_eq. split;intros H;[inversion H | subst]; trivial.
     Qed.
 
@@ -1819,14 +1818,14 @@ Qed.
       Proof.
         intros [op|op h|op h1 h2|op h1 h2 h3|op ha|f l]; simpl.
         (* Constants *)
-        destruct op; intros [ i | | | | | ]; simpl; try discriminate; intros n0.
+        destruct op; intros [ i | | | | | | ]; simpl; try discriminate; intros n0.
         exists 1%positive; auto. 
         exists 0%Z; auto.
         intros. red in H. rewrite Nat.eqb_eq in H. rewrite <- H.
         exists w. easy.
-     (*  exists (BITVECTOR_LIST._of_bits l n0). *)
+        (* intros. exists (BITVECTOR_LIST._of_bits l n0). *)
         (* Unary operators *)
-        destruct op; intros [ ind| | | | | ]; 
+        destruct op; intros [ ind| | | | | | ]; 
         simpl; try discriminate; try rewrite Typ.eqb_spec; 
         intros H1a; destruct (check_aux_interp_hatom h) 
         as [x Hx]; rewrite Hx; simpl; generalize x Hx; 
@@ -1880,22 +1879,22 @@ Qed.
         exists (wextr y i (i + n0) n0). easy.
   (* Binary operators *)
         destruct op as [ | | | | | | A |s1|s2| s3 | s4 | s5 | s6 | s7 | s8 | s9 | | ];
-          [ intros [ i | | | | |s ] |
-            intros [ i | | | | |s ] |
-            intros [ i | | | | |s ] |
-            intros [ i | | | | |s ] |
-            intros [ i | | | | |s ] |
-            intros [ i | | | | |s ] |
-            intros [ i | | | | |s ] |
-            intros [ i | | | | |s ] |
-            intros [ i | | | | |s ] |
-            intros [ i | | | | |s ] |
-            intros [ i | | | | |s ] |
-            intros [ i | | | | |s ] |
-            intros [ i | | | | |s ] |
-            intros [ i | | | | |s ] |
-            intros [ i | | | | |s ] |
-            intros [ i | | | | |s ] | |
+          [ intros [ i | | | | | |s ] |
+            intros [ i | | | | | |s ] |
+            intros [ i | | | | | |s ] |
+            intros [ i | | | | | |s ] |
+            intros [ i | | | | | |s ] |
+            intros [ i | | | | | |s ] |
+            intros [ i | | | | | |s ] |
+            intros [ i | | | | | |s ] |
+            intros [ i | | | | | |s ] |
+            intros [ i | | | | | |s ] |
+            intros [ i | | | | | |s ] |
+            intros [ i | | | | | |s ] |
+            intros [ i | | | | | |s ] |
+            intros [ i | | | | | |s ] |
+            intros [ i | | | | | |s ] |
+            intros [ i | | | | | |s ] | |
             ];
         simpl; try discriminate; unfold is_true;
         try (rewrite andb_true_iff ;change (Typ.eqb (get_type h1) Typ.TZ = true /\ Typ.eqb (get_type h2) Typ.TZ = true) with 
@@ -2062,7 +2061,7 @@ Qed.
         exists (FArray.diff x1 x2); auto.
 
         (* Ternary operatores *)
-        destruct op as [ti te]; intros [ | | | | | ]; 
+        destruct op as [ti te]; intros [ | | | | | | ]; 
           simpl; try discriminate; unfold is_true.
         intros Hz Ho H.
         rewrite !andb_true_iff in H.
@@ -2083,7 +2082,7 @@ Qed.
         exists (FArray.store x1 x2 x3); auto.
 
         (* N-ary operators *)
-        destruct op as [A]; simpl; intros [ | | | | | ]; try discriminate; simpl; intros _; case (compute_interp A nil ha).
+        destruct op as [A]; simpl; intros [ | | | | | | ]; try discriminate; simpl; intros _; case (compute_interp A nil ha).
         intro l; exists (distinct (Typ.i_eqb t_i A) (rev l)); auto.
         exists true; auto.
         (* Application *)

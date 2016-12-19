@@ -26,7 +26,7 @@ open SmtTrace
 open SmtCertif
 
 
-let euf_checker_modules = [ ["SMTCoq";"Trace";"Euf_Checker"] ]
+let euf_checker_modules = [ ["SMTCoq";"Trace";"Euf_Checker"; "Word"] ]
 let certif_ops args = CoqTerms.make_certif_ops euf_checker_modules args
 let cCertif = gen_constant euf_checker_modules "Certif"
 let ccertif = gen_constant euf_checker_modules "certif"
